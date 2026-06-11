@@ -8,7 +8,7 @@
   const DEFAULT_SETTINGS = {
     babyName: 'Ediz',
     birthDate: '2026-05-14',
-    geminiApiKey: 'AIzaSyAIJmQruzTNOVvwYbw_80BLI-q3RbqLb1o'
+    geminiApiKey: 'AQ.Ab8RN6J6rrhv0TYePFyOmCRSU4D8PPbokXi0_tLLvWugZUQUKA'
   };
   const FIXED_BIRTH_DATE = DEFAULT_SETTINGS.birthDate;
   const FIXED_GEMINI_KEY = DEFAULT_SETTINGS.geminiApiKey;
