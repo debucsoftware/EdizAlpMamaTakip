@@ -124,7 +124,10 @@
     <section class="timeline card">
       <div class="timeline-header">
         <h2 class="section-title">📋 Bugünkü Kayıtlar</h2>
-        <button class="btn-text" id="reportBtn">📄 Rapor Al</button>
+        <div class="timeline-actions">
+          <button type="button" class="btn-text" id="reportBtn">📄 Rapor Al</button>
+          <button type="button" class="btn-text" id="weeklyReportBtn">📊 Haftalık Rapor</button>
+        </div>
       </div>
       <ul class="timeline-list" id="timelineList">
         <li class="empty-state">Henüz kayıt yok. İlk kaydı ekleyin! 🌟</li>
@@ -151,13 +154,6 @@
         <label class="field-label">Bebeğin Adı</label>
         <input type="text" id="babyNameInput" class="input" placeholder="Örn: Ediz" maxlength="30">
         <p class="hint">Beslenme kayıtları telefonunuzda saklanır. Doğum tarihi sabittir.</p>
-
-        <div class="api-test-box">
-          <label class="field-label">🔧 Groq API Test (geçici)</label>
-          <input type="text" id="groqApiTestInput" class="input" placeholder="gsk_..." autocomplete="off">
-          <button type="button" class="btn-secondary btn-full" id="apiTestBtn">API Test Et</button>
-          <pre class="api-test-result" id="apiTestResult">Test sonucu burada görünür...</pre>
-        </div>
       </div>
       <div class="modal-footer">
         <button class="btn-primary" id="saveSettings">Kaydet</button>
@@ -182,10 +178,30 @@
     </div>
   </div>
 
+  <!-- Haftalık Rapor Modal -->
+  <div class="modal-overlay" id="weeklyReportModal" hidden>
+    <div class="modal modal-report">
+      <div class="modal-header">
+        <h3>📊 Haftalık Rapor</h3>
+        <button class="btn-close" id="closeWeeklyReport">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="chart-wrap">
+          <canvas id="weeklyChart" class="weekly-chart"></canvas>
+        </div>
+        <pre class="report-content" id="weeklyReportContent"></pre>
+      </div>
+      <div class="modal-footer modal-footer-split">
+        <button class="btn-secondary" id="copyWeeklyReport">📋 Kopyala</button>
+        <button class="btn-primary" id="shareWeeklyReport">📤 Paylaş</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div class="toast" id="toast" hidden></div>
 
-  <script src="js/seed-data.js?v=7"></script>
-  <script src="js/app.js?v=7"></script>
+  <script src="js/seed-data.js?v=9"></script>
+  <script src="js/app.js?v=9"></script>
 </body>
 </html>

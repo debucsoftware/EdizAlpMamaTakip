@@ -64,6 +64,13 @@
     timelineList: document.getElementById('timelineList'),
     historyList: document.getElementById('historyList'),
     reportBtn: document.getElementById('reportBtn'),
+    weeklyReportBtn: document.getElementById('weeklyReportBtn'),
+    weeklyReportModal: document.getElementById('weeklyReportModal'),
+    closeWeeklyReport: document.getElementById('closeWeeklyReport'),
+    weeklyChart: document.getElementById('weeklyChart'),
+    weeklyReportContent: document.getElementById('weeklyReportContent'),
+    copyWeeklyReport: document.getElementById('copyWeeklyReport'),
+    shareWeeklyReport: document.getElementById('shareWeeklyReport'),
     settingsBtn: document.getElementById('settingsBtn'),
     settingsModal: document.getElementById('settingsModal'),
     closeSettings: document.getElementById('closeSettings'),
@@ -78,10 +85,7 @@
     babyAge: document.getElementById('babyAge'),
     aiPlaceholder: document.getElementById('aiPlaceholder'),
     aiContent: document.getElementById('aiContent'),
-    aiSourceBadge: document.getElementById('aiSourceBadge'),
-    groqApiTestInput: document.getElementById('groqApiTestInput'),
-    apiTestBtn: document.getElementById('apiTestBtn'),
-    apiTestResult: document.getElementById('apiTestResult')
+    aiSourceBadge: document.getElementById('aiSourceBadge')
   };
 
   // --- Storage ---
@@ -439,63 +443,6 @@
     throw lastError || new Error('Groq modelleri başarısız');
   }
 
-  async function testGroqApiDebug(apiKey) {
-    const lines = [];
-    lines.push('🔑 Anahtar: ' + (apiKey ? apiKey.slice(0, 8) + '...' + apiKey.slice(-4) : 'BOŞ'));
-    lines.push('🌐 URL: ' + GROQ_API_URL);
-    lines.push('⏰ ' + new Date().toLocaleString('tr-TR'));
-    lines.push('—'.repeat(28));
-
-    if (!apiKey) {
-      lines.push('❌ API anahtarı boş!');
-      return lines.join('\n');
-    }
-
-    for (let i = 0; i < GROQ_MODELS.length; i++) {
-      const model = GROQ_MODELS[i];
-      lines.push('\n📦 Model: ' + model);
-      try {
-        const res = await fetch(GROQ_API_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + apiKey
-          },
-          body: JSON.stringify({
-            model: model,
-            messages: [
-              { role: 'user', content: 'Test: tek kelimeyle merhaba de.' }
-            ],
-            max_tokens: 50
-          })
-        });
-        lines.push('📡 HTTP: ' + res.status + ' ' + res.statusText);
-        const raw = await res.text();
-        try {
-          const data = JSON.parse(raw);
-          if (data.choices?.[0]?.message?.content) {
-            lines.push('✅ BAŞARILI');
-            lines.push('Yanıt: ' + data.choices[0].message.content);
-          } else if (data.error) {
-            lines.push('❌ HATA');
-            lines.push(JSON.stringify(data.error, null, 2));
-          } else {
-            lines.push('⚠️ Beklenmeyen yanıt:');
-            lines.push(JSON.stringify(data, null, 2));
-          }
-        } catch {
-          lines.push('⚠️ JSON değil, ham yanıt:');
-          lines.push(raw.slice(0, 800));
-        }
-        if (res.ok) break;
-      } catch (err) {
-        lines.push('❌ FETCH HATASI (CORS/ağ?)');
-        lines.push(String(err.message || err));
-      }
-    }
-    return lines.join('\n');
-  }
-
   function trySilentAiAdvice(forceRefresh) {
     const settings = loadSettings();
     const age = getBabyAge(settings.birthDate);
@@ -521,7 +468,7 @@
       saveLastSuccessAdvice(text);
       showAiAdvice(text, 'ai');
     }).catch(function () {
-      setAdviceSource('local');
+      updateLocalAdvice();
     }).finally(function () {
       aiLoading = false;
     });
@@ -558,7 +505,7 @@
   function renderAiSection() {
     renderBabyAge();
     updateLocalAdvice();
-    trySilentAiAdvice(false);
+    trySilentAiAdvice(true);
   }
 
   function updateLocalAdvice() {
@@ -830,6 +777,156 @@
     return report;
   }
 
+  function formatChartDate(dateKey) {
+    if (dateKey === todayKey()) return 'Bugün';
+    const d = new Date(dateKey + 'T12:00:00');
+    return d.toLocaleDateString('tr-TR', { weekday: 'short', day: 'numeric' });
+  }
+
+  function getLast7DaysStats() {
+    const data = loadData();
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(todayKey() + 'T12:00:00');
+      d.setDate(d.getDate() - i);
+      const key = getDateKeyFromTimestamp(d.toISOString());
+      const entries = getEntriesForDate(data.entries, key);
+      const stats = calcStats(entries);
+      days.push({
+        dateKey: key,
+        sut: stats.sut,
+        mama: stats.mama,
+        total: stats.total,
+        kaka: stats.kaka
+      });
+    }
+    return days;
+  }
+
+  function drawWeeklyChart(canvas, days) {
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth || 320;
+    const h = 220;
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const pad = { top: 28, right: 12, bottom: 40, left: 38 };
+    const chartW = w - pad.left - pad.right;
+    const chartH = h - pad.top - pad.bottom;
+    const maxVal = Math.max(100, ...days.map(function (d) { return d.total; }));
+    const niceMax = Math.ceil(maxVal / 100) * 100;
+
+    for (let i = 0; i <= 4; i++) {
+      const y = pad.top + chartH * (1 - i / 4);
+      const val = Math.round(niceMax * i / 4);
+      ctx.strokeStyle = '#ececec';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(pad.left + chartW, y);
+      ctx.stroke();
+      ctx.fillStyle = '#888';
+      ctx.font = '600 10px Nunito, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(String(val), pad.left - 5, y + 3);
+    }
+
+    const xAt = function (i) {
+      return days.length > 1 ? pad.left + (i / (days.length - 1)) * chartW : pad.left + chartW / 2;
+    };
+    const yAt = function (val) {
+      return pad.top + chartH * (1 - val / niceMax);
+    };
+
+    function drawLine(key, color, width, dashed) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.setLineDash(dashed ? [7, 4] : []);
+      ctx.beginPath();
+      days.forEach(function (day, i) {
+        const x = xAt(i);
+        const y = yAt(day[key]);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      ctx.setLineDash([]);
+      days.forEach(function (day, i) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(xAt(i), yAt(day[key]), 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    drawLine('sut', '#ff91a4', 2.5, false);
+    drawLine('mama', '#7ec8e3', 2.5, false);
+    drawLine('total', '#f59e0b', 3, true);
+
+    days.forEach(function (day, i) {
+      ctx.fillStyle = '#555';
+      ctx.font = '700 10px Nunito, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(formatChartDate(day.dateKey), xAt(i), h - 12);
+    });
+
+    const legends = [
+      { label: '🍼 Süt', color: '#ff91a4' },
+      { label: '🍶 Mama', color: '#7ec8e3' },
+      { label: '💧 Toplam', color: '#f59e0b' }
+    ];
+    let lx = pad.left;
+    legends.forEach(function (leg) {
+      ctx.strokeStyle = leg.color;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(lx, 12);
+      ctx.lineTo(lx + 14, 12);
+      ctx.stroke();
+      ctx.fillStyle = '#333';
+      ctx.font = '700 11px Nunito, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(leg.label, lx + 18, 15);
+      lx += 18 + ctx.measureText(leg.label).width + 14;
+    });
+  }
+
+  function generateWeeklyReportText(days) {
+    const settings = loadSettings();
+    const name = settings.babyName.trim() || 'Bebiş';
+    let report = '📊 ' + name + ' - Haftalık Rapor (Son 7 Gün)\n';
+    report += '='.repeat(30) + '\n\n';
+
+    days.forEach(function (d) {
+      report += formatDate(d.dateKey) + '\n';
+      report += '  🍼 Süt: ' + d.sut + ' ml  🍶 Mama: ' + d.mama + ' ml  💧 Toplam: ' + d.total + ' ml  💩 ' + d.kaka + ' bez\n\n';
+    });
+
+    const sumSut = days.reduce(function (s, d) { return s + d.sut; }, 0);
+    const sumMama = days.reduce(function (s, d) { return s + d.mama; }, 0);
+    const sumTotal = sumSut + sumMama;
+    report += '📈 HAFTA TOPLAMI\n';
+    report += '  🍼 Süt: ' + sumSut + ' ml\n';
+    report += '  🍶 Mama: ' + sumMama + ' ml\n';
+    report += '  💧 Toplam: ' + sumTotal + ' ml\n';
+    report += '  📊 Günlük ortalama: ' + Math.round(sumTotal / 7) + ' ml\n';
+    report += '\n' + '='.repeat(30) + '\nBebiş Takip 👶';
+    return report;
+  }
+
+  function showWeeklyReport() {
+    const days = getLast7DaysStats();
+    els.weeklyReportContent.textContent = generateWeeklyReportText(days);
+    els.weeklyReportModal.hidden = false;
+    requestAnimationFrame(function () {
+      drawWeeklyChart(els.weeklyChart, days);
+    });
+  }
+
   function showReportForDate(dateKey) {
     els.reportContent.textContent = generateReport(dateKey);
     els.reportModal.hidden = false;
@@ -858,6 +955,28 @@
       }
     } else {
       copyReport();
+    }
+  }
+
+  async function copyWeeklyReport() {
+    try {
+      await navigator.clipboard.writeText(els.weeklyReportContent.textContent);
+      showToast('Haftalık rapor kopyalandı! 📋');
+    } catch {
+      showToast('Kopyalama başarısız oldu');
+    }
+  }
+
+  async function shareWeeklyReport() {
+    const text = els.weeklyReportContent.textContent;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Bebiş Haftalık Rapor', text });
+      } catch {
+        /* kullanıcı iptal etti */
+      }
+    } else {
+      copyWeeklyReport();
     }
   }
 
@@ -907,16 +1026,18 @@
 
   els.addBtn.addEventListener('click', addEntry);
   els.reportBtn.addEventListener('click', showTodayReport);
+  els.weeklyReportBtn.addEventListener('click', showWeeklyReport);
+
+  els.closeWeeklyReport.addEventListener('click', () => { els.weeklyReportModal.hidden = true; });
+  els.weeklyReportModal.addEventListener('click', e => {
+    if (e.target === els.weeklyReportModal) els.weeklyReportModal.hidden = true;
+  });
+  els.copyWeeklyReport.addEventListener('click', copyWeeklyReport);
+  els.shareWeeklyReport.addEventListener('click', shareWeeklyReport);
 
   els.settingsBtn.addEventListener('click', () => {
     const settings = loadSettings();
     els.babyNameInput.value = settings.babyName || '';
-    if (els.groqApiTestInput) {
-      els.groqApiTestInput.value = settings.groqApiKey || '';
-    }
-    if (els.apiTestResult) {
-      els.apiTestResult.textContent = 'Test sonucu burada görünür...';
-    }
     els.settingsModal.hidden = false;
   });
 
@@ -934,21 +1055,6 @@
     updateLocalAdvice();
     trySilentAiAdvice(true);
   });
-
-  if (els.apiTestBtn) {
-    els.apiTestBtn.addEventListener('click', async () => {
-      const key = els.groqApiTestInput ? els.groqApiTestInput.value.trim() : '';
-      els.apiTestResult.textContent = '⏳ Test ediliyor...';
-      els.apiTestBtn.disabled = true;
-      try {
-        els.apiTestResult.textContent = await testGroqApiDebug(key);
-      } catch (e) {
-        els.apiTestResult.textContent = '❌ ' + (e.message || e);
-      } finally {
-        els.apiTestBtn.disabled = false;
-      }
-    });
-  }
 
   els.closeReport.addEventListener('click', () => { els.reportModal.hidden = true; });
   els.reportModal.addEventListener('click', e => {
