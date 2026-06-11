@@ -344,7 +344,35 @@ body {
 }
 
 .ai-header .section-title {
-  margin-bottom: 0;
+  margin-bottom: 0.25rem;
+}
+
+.ai-title-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.ai-source-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+}
+
+.ai-source-local {
+  color: #5b5b5b;
+  background: #f0f0f0;
+}
+
+.ai-source-ai {
+  color: #065f46;
+  background: #d1fae5;
+}
+
+.ai-source-loading {
+  color: #7c3aed;
+  background: #ede9fe;
 }
 
 .baby-age {

@@ -79,7 +79,8 @@
     toast: document.getElementById('toast'),
     babyAge: document.getElementById('babyAge'),
     aiPlaceholder: document.getElementById('aiPlaceholder'),
-    aiContent: document.getElementById('aiContent')
+    aiContent: document.getElementById('aiContent'),
+    aiSourceBadge: document.getElementById('aiSourceBadge')
   };
 
   // --- Storage ---
@@ -450,7 +451,7 @@
     if (!forceRefresh) {
       const cached = loadCachedAdvice();
       if (cached && cached.text) {
-        showAiAdvice(cached.text);
+        showAiAdvice(cached.text, 'ai');
         return;
       }
     }
@@ -458,23 +459,40 @@
     if (aiLoading) return;
 
     aiLoading = true;
+    setAdviceSource('loading');
     const prompt = buildAiPrompt(settings, age);
     callGeminiApi(settings.geminiApiKey, prompt).then(function (text) {
       lastApiCallAt = Date.now();
       saveCachedAdvice(text);
       saveLastSuccessAdvice(text);
-      showAiAdvice(text);
+      showAiAdvice(text, 'ai');
     }).catch(function () {
-      /* sessiz — yerel tavsiye zaten gösteriliyor */
+      setAdviceSource('local');
     }).finally(function () {
       aiLoading = false;
     });
   }
 
-  function showAiAdvice(text) {
+  function setAdviceSource(source) {
+    if (!els.aiSourceBadge) return;
+    els.aiSourceBadge.className = 'ai-source-badge';
+    if (source === 'ai') {
+      els.aiSourceBadge.classList.add('ai-source-ai');
+      els.aiSourceBadge.textContent = '🤖 Gemini AI';
+    } else if (source === 'loading') {
+      els.aiSourceBadge.classList.add('ai-source-loading');
+      els.aiSourceBadge.textContent = '⏳ AI güncelleniyor...';
+    } else {
+      els.aiSourceBadge.classList.add('ai-source-local');
+      els.aiSourceBadge.textContent = '📱 Yerel tavsiye';
+    }
+  }
+
+  function showAiAdvice(text, source) {
     els.aiContent.textContent = text;
     els.aiContent.hidden = false;
     els.aiPlaceholder.hidden = true;
+    if (source) setAdviceSource(source);
   }
 
   function renderBabyAge() {
@@ -492,7 +510,7 @@
   function updateLocalAdvice() {
     const settings = loadSettings();
     const age = getBabyAge(settings.birthDate);
-    if (age) showAiAdvice(buildLocalAdvice(settings, age));
+    if (age) showAiAdvice(buildLocalAdvice(settings, age), 'local');
   }
 
   function scheduleAiRefresh() {
