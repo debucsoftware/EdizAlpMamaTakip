@@ -1,9 +1,6 @@
 (function () {
   'use strict';
 
-  const STORAGE_KEY = 'bebistakip_data';
-  const SETTINGS_KEY = 'bebistakip_settings';
-  const SEED_FLAG = 'bebistakip_seed_v1';
   const AI_CACHE_PREFIX = 'bebistakip_ai_';
   const DEFAULT_SETTINGS = {
     babyName: 'Ediz',
@@ -45,6 +42,7 @@
   let lastAdviceHour = new Date().getHours();
   let lastApiCallAt = 0;
   let aiRefreshTimer = null;
+  let firestoreReady = false;
 
   // DOM
   const els = {
@@ -88,55 +86,38 @@
     aiSourceBadge: document.getElementById('aiSourceBadge')
   };
 
-  // --- Storage ---
+  // --- Storage (Firestore only) ---
 
   function loadData() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : { entries: [] };
-    } catch {
-      return { entries: [] };
+    if (window.FirestoreSync && window.FirestoreSync.isReady()) {
+      return window.FirestoreSync.getData();
     }
+    return { entries: [] };
   }
 
   function saveData(data) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    if (window.FirestoreSync && window.FirestoreSync.isReady()) {
-      window.FirestoreSync.push(data, loadSettings());
-    }
+    if (!window.FirestoreSync || !window.FirestoreSync.isReady()) return;
+    window.FirestoreSync.saveData(data).catch(function () {
+      showToast('Kayıt kaydedilemedi ☁️');
+    });
   }
 
   function loadSettings() {
-    try {
-      const raw = localStorage.getItem(SETTINGS_KEY);
-      const parsed = raw ? JSON.parse(raw) : {};
-      return {
-        babyName: parsed.babyName || DEFAULT_SETTINGS.babyName,
-        birthDate: FIXED_BIRTH_DATE,
-        groqApiKey: FIXED_GROQ_KEY
-      };
-    } catch {
-      return { ...DEFAULT_SETTINGS };
-    }
+    const synced = (window.FirestoreSync && window.FirestoreSync.isReady())
+      ? window.FirestoreSync.getSettings()
+      : { babyName: DEFAULT_SETTINGS.babyName };
+    return {
+      babyName: synced.babyName || DEFAULT_SETTINGS.babyName,
+      birthDate: FIXED_BIRTH_DATE,
+      groqApiKey: FIXED_GROQ_KEY
+    };
   }
 
   function saveSettingsData(settings) {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-      babyName: settings.babyName || DEFAULT_SETTINGS.babyName
-    }));
-    if (window.FirestoreSync && window.FirestoreSync.isReady()) {
-      window.FirestoreSync.push(loadData(), loadSettings());
-    }
-  }
-
-  function importSeedIfNeeded() {
-    if (localStorage.getItem(SEED_FLAG)) return;
-    if (!window.BEBIS_SEED) return;
-    saveData({ entries: window.BEBIS_SEED.entries || [] });
-    if (window.BEBIS_SEED.settings) {
-      saveSettingsData(window.BEBIS_SEED.settings);
-    }
-    localStorage.setItem(SEED_FLAG, '1');
+    if (!window.FirestoreSync || !window.FirestoreSync.isReady()) return;
+    window.FirestoreSync.saveSettings(settings).catch(function () {
+      showToast('Ayarlar kaydedilemedi ☁️');
+    });
   }
 
   function formatEntryDetail(entry) {
@@ -672,6 +653,11 @@
   }
 
   function addEntry() {
+    if (!firestoreReady) {
+      showToast('Veriler yükleniyor, bekleyin ☁️');
+      return;
+    }
+
     const timeVal = els.timeInput.value;
     if (!timeVal) {
       showToast('Lütfen saat girin ⏰');
@@ -1101,13 +1087,16 @@
   }
 
   async function initApp() {
-    importSeedIfNeeded();
-
     if (window.FirestoreSync) {
       const syncResult = await window.FirestoreSync.init(onRemoteSyncUpdate);
-      if (syncResult && syncResult.uploaded && syncResult.entryCount > 0) {
+      firestoreReady = !!syncResult;
+      if (!firestoreReady) {
+        showToast('Firestore bağlantısı kurulamadı ☁️');
+      } else if (syncResult.uploaded && syncResult.entryCount > 0) {
         showToast(syncResult.entryCount + ' kayıt Firestore\'a yüklendi ☁️');
       }
+    } else {
+      showToast('Firestore yüklenemedi ☁️');
     }
 
     setCurrentTime();

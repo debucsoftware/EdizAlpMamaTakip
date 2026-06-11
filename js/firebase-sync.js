@@ -1,11 +1,9 @@
 (function () {
   'use strict';
 
-  const STORAGE_KEY = 'bebistakip_data';
-  const SETTINGS_KEY = 'bebistakip_settings';
-  const SEED_FLAG = 'bebistakip_seed_v1';
   const DOC_COLLECTION = 'app';
   const DOC_ID = 'ediz';
+  const DEFAULT_BABY_NAME = 'Ediz';
 
   const firebaseConfig = {
     apiKey: 'AIzaSyBJi-kNnFrTIgQQxIz16Rvjga2zMJV4OJY',
@@ -22,124 +20,71 @@
   let ignoreNextSnapshot = false;
   let lastPushAt = 0;
   let onRemoteUpdateCallback = null;
+  let ready = false;
 
-  function getLocalData() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : { entries: [] };
-    } catch {
-      return { entries: [] };
-    }
-  }
-
-  function setLocalData(data) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }
-
-  function getLocalSettings() {
-    try {
-      const raw = localStorage.getItem(SETTINGS_KEY);
-      const parsed = raw ? JSON.parse(raw) : {};
-      return { babyName: parsed.babyName || 'Ediz' };
-    } catch {
-      return { babyName: 'Ediz' };
-    }
-  }
-
-  function setLocalSettings(settings) {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-      babyName: settings.babyName || 'Ediz'
-    }));
-  }
+  const state = {
+    entries: [],
+    settings: { babyName: DEFAULT_BABY_NAME }
+  };
 
   function getSeedEntries() {
     if (!window.BEBIS_SEED || !window.BEBIS_SEED.entries) return [];
     return window.BEBIS_SEED.entries;
   }
 
-  function mergeEntries(a, b) {
-    const map = new Map();
-    (a || []).concat(b || []).forEach(function (entry) {
-      if (entry && entry.id) map.set(entry.id, entry);
-    });
-    return Array.from(map.values()).sort(function (x, y) {
-      return new Date(x.timestamp) - new Date(y.timestamp);
-    });
-  }
-
-  function mergeAllSources(localEntries, seedEntries, remoteEntries) {
-    return mergeEntries(mergeEntries(localEntries, seedEntries), remoteEntries);
-  }
-
   function entriesSignature(entries) {
     return (entries || []).map(function (e) { return e.id; }).join(',');
   }
 
-  function applyRemote(remote) {
-    const local = getLocalData();
-    const mergedEntries = mergeEntries(local.entries, remote.entries);
-    const localSettings = getLocalSettings();
-    const remoteSettings = remote.settings || {};
+  function buildPayload() {
+    return {
+      entries: state.entries,
+      settings: { babyName: state.settings.babyName || DEFAULT_BABY_NAME },
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+  }
 
-    const entriesChanged = entriesSignature(local.entries) !== entriesSignature(mergedEntries);
-    const settingsChanged = (remoteSettings.babyName || 'Ediz') !== (localSettings.babyName || 'Ediz');
+  function applyRemote(remote) {
+    const remoteEntries = remote.entries || [];
+    const remoteSettings = remote.settings || {};
+    const entriesChanged = entriesSignature(state.entries) !== entriesSignature(remoteEntries);
+    const settingsChanged = (remoteSettings.babyName || DEFAULT_BABY_NAME)
+      !== (state.settings.babyName || DEFAULT_BABY_NAME);
 
     if (!entriesChanged && !settingsChanged) return false;
 
-    setLocalData({ entries: mergedEntries });
+    state.entries = remoteEntries;
     if (remoteSettings.babyName) {
-      setLocalSettings({ babyName: remoteSettings.babyName });
-    }
-    if (remote.entries && remote.entries.length > 0) {
-      localStorage.setItem(SEED_FLAG, '1');
+      state.settings.babyName = remoteSettings.babyName;
     }
     return true;
-  }
-
-  function buildPayload(data, settings) {
-    return {
-      entries: data.entries || [],
-      settings: { babyName: settings.babyName || 'Ediz' },
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
   }
 
   async function bootstrap() {
     const docRef = db.collection(DOC_COLLECTION).doc(DOC_ID);
     const snap = await docRef.get();
 
-    const localData = getLocalData();
-    const localSettings = getLocalSettings();
+    if (snap.exists) {
+      const remote = snap.data();
+      state.entries = remote.entries || [];
+      state.settings.babyName = (remote.settings && remote.settings.babyName) || DEFAULT_BABY_NAME;
+      return { entryCount: state.entries.length, uploaded: false };
+    }
+
     const seedEntries = getSeedEntries();
     const seedSettings = window.BEBIS_SEED && window.BEBIS_SEED.settings;
-    const remoteData = snap.exists ? snap.data() : null;
-    const remoteEntries = remoteData ? (remoteData.entries || []) : [];
+    state.entries = seedEntries.slice();
+    state.settings.babyName = (seedSettings && seedSettings.babyName) || DEFAULT_BABY_NAME;
 
-    const mergedEntries = mergeAllSources(localData.entries, seedEntries, remoteEntries);
-    const mergedSettings = {
-      babyName: (remoteData && remoteData.settings && remoteData.settings.babyName)
-        || (seedSettings && seedSettings.babyName)
-        || localSettings.babyName
-        || 'Ediz'
+    ignoreNextSnapshot = true;
+    lastPushAt = Date.now();
+    await docRef.set(buildPayload());
+    setTimeout(function () { ignoreNextSnapshot = false; }, 800);
+
+    return {
+      entryCount: state.entries.length,
+      uploaded: state.entries.length > 0
     };
-
-    setLocalData({ entries: mergedEntries });
-    setLocalSettings(mergedSettings);
-    if (mergedEntries.length > 0) {
-      localStorage.setItem(SEED_FLAG, '1');
-    }
-
-    const needsUpload = !snap.exists || mergedEntries.length > remoteEntries.length
-      || entriesSignature(mergedEntries) !== entriesSignature(remoteEntries);
-
-    if (needsUpload && mergedEntries.length > 0) {
-      ignoreNextSnapshot = true;
-      lastPushAt = Date.now();
-      await docRef.set(buildPayload({ entries: mergedEntries }, mergedSettings));
-      setTimeout(function () { ignoreNextSnapshot = false; }, 800);
-    }
-
-    return { entryCount: mergedEntries.length, uploaded: needsUpload && mergedEntries.length > 0 };
   }
 
   function startListener() {
@@ -156,35 +101,43 @@
     });
   }
 
-  async function pushToFirestore(data, settings) {
+  async function pushToFirestore() {
     if (!db) return;
     try {
       lastPushAt = Date.now();
       ignoreNextSnapshot = true;
-      const docRef = db.collection(DOC_COLLECTION).doc(DOC_ID);
-      const snap = await docRef.get();
-      let entries = data.entries || [];
-
-      if (snap.exists) {
-        entries = mergeEntries(entries, snap.data().entries);
-      }
-
-      await docRef.set({
-        entries: entries,
-        settings: { babyName: (settings && settings.babyName) || 'Ediz' },
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-
-      setLocalData({ entries: entries });
+      await db.collection(DOC_COLLECTION).doc(DOC_ID).set(buildPayload(), { merge: true });
     } catch (err) {
       console.error('Firestore kayıt hatası:', err);
+      throw err;
     } finally {
       setTimeout(function () { ignoreNextSnapshot = false; }, 800);
     }
   }
 
+  function getData() {
+    return { entries: state.entries.slice() };
+  }
+
+  function getSettings() {
+    return { babyName: state.settings.babyName || DEFAULT_BABY_NAME };
+  }
+
+  function saveData(data) {
+    state.entries = (data.entries || []).slice();
+    return pushToFirestore();
+  }
+
+  function saveSettings(settings) {
+    if (settings && settings.babyName) {
+      state.settings.babyName = settings.babyName;
+    }
+    return pushToFirestore();
+  }
+
   async function init(onRemoteUpdate) {
     onRemoteUpdateCallback = onRemoteUpdate;
+    ready = false;
 
     if (!window.firebase) {
       console.warn('Firebase SDK yüklenemedi');
@@ -198,6 +151,7 @@
       db = firebase.firestore();
       const bootstrapResult = await bootstrap();
       startListener();
+      ready = true;
       return bootstrapResult || { entryCount: 0, uploaded: false };
     } catch (err) {
       console.error('Firestore başlatma hatası:', err);
@@ -207,7 +161,10 @@
 
   window.FirestoreSync = {
     init: init,
-    push: pushToFirestore,
-    isReady: function () { return !!db; }
+    isReady: function () { return ready; },
+    getData: getData,
+    getSettings: getSettings,
+    saveData: saveData,
+    saveSettings: saveSettings
   };
 })();
