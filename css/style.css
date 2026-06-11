@@ -286,6 +286,20 @@ body {
   background: var(--white);
 }
 
+.bez-panel {
+  margin-bottom: 0.5rem;
+}
+
+.feed-panel {
+  margin-bottom: 0.5rem;
+}
+
+.textarea-input {
+  resize: vertical;
+  min-height: 4rem;
+  line-height: 1.4;
+}
+
 .note-section {
   margin-bottom: 0.25rem;
 }

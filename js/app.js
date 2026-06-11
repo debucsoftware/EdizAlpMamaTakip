@@ -10,6 +10,8 @@
     birthDate: '2026-05-14',
     geminiApiKey: 'AIzaSyAIJmQruzTNOVvwYbw_80BLI-q3RbqLb1o'
   };
+  const FIXED_BIRTH_DATE = DEFAULT_SETTINGS.birthDate;
+  const FIXED_GEMINI_KEY = DEFAULT_SETTINGS.geminiApiKey;
   const GEMINI_MODEL = 'gemini-2.0-flash';
 
   const TYPE_CONFIG = {
@@ -44,8 +46,8 @@
     statTotal: document.getElementById('statTotal'),
     statKaka: document.getElementById('statKaka'),
     encouragement: document.getElementById('encouragement'),
-    amountSection: document.getElementById('amountSection'),
-    noteSection: document.getElementById('noteSection'),
+    feedPanel: document.getElementById('feedPanel'),
+    bezPanel: document.getElementById('bezPanel'),
     noteInput: document.getElementById('noteInput'),
     amountInput: document.getElementById('amountInput'),
     timeInput: document.getElementById('timeInput'),
@@ -66,9 +68,7 @@
     toast: document.getElementById('toast'),
     babyAge: document.getElementById('babyAge'),
     aiPlaceholder: document.getElementById('aiPlaceholder'),
-    aiContent: document.getElementById('aiContent'),
-    birthDateInput: document.getElementById('birthDateInput'),
-    geminiKeyInput: document.getElementById('geminiKeyInput')
+    aiContent: document.getElementById('aiContent')
   };
 
   // --- Storage ---
@@ -90,26 +90,20 @@
     try {
       const raw = localStorage.getItem(SETTINGS_KEY);
       const parsed = raw ? JSON.parse(raw) : {};
-      const merged = { ...DEFAULT_SETTINGS, ...parsed };
-      if (!merged.geminiApiKey) merged.geminiApiKey = DEFAULT_SETTINGS.geminiApiKey;
-      return merged;
+      return {
+        babyName: parsed.babyName || DEFAULT_SETTINGS.babyName,
+        birthDate: FIXED_BIRTH_DATE,
+        geminiApiKey: FIXED_GEMINI_KEY
+      };
     } catch {
       return { ...DEFAULT_SETTINGS };
     }
   }
 
-  function migrateSettingsIfNeeded() {
-    try {
-      const raw = localStorage.getItem(SETTINGS_KEY);
-      const parsed = raw ? JSON.parse(raw) : {};
-      if (!parsed.geminiApiKey && DEFAULT_SETTINGS.geminiApiKey) {
-        saveSettingsData({ ...DEFAULT_SETTINGS, ...parsed, geminiApiKey: DEFAULT_SETTINGS.geminiApiKey });
-      }
-    } catch { /* ignore */ }
-  }
-
   function saveSettingsData(settings) {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+      babyName: settings.babyName || DEFAULT_SETTINGS.babyName
+    }));
   }
 
   function importSeedIfNeeded() {
@@ -554,20 +548,23 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
 
   function updateAmountVisibility() {
     const isKaka = selectedType === 'kaka';
-    if (els.amountSection) {
-      els.amountSection.style.display = isKaka ? 'none' : 'block';
-    }
-    if (els.noteSection) {
-      els.noteSection.style.display = isKaka ? 'block' : 'none';
-    }
+    if (els.feedPanel) els.feedPanel.hidden = isKaka;
+    if (els.bezPanel) els.bezPanel.hidden = !isKaka;
     if (isKaka) {
       els.amountInput.value = '';
       selectedPreset = null;
       document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
-    } else if (els.noteInput) {
-      els.noteInput.value = '';
+      setTimeout(function () {
+        if (els.noteInput) els.noteInput.focus();
+      }, 50);
+    } else {
+      if (els.noteInput) els.noteInput.value = '';
       document.querySelectorAll('.note-preset-btn').forEach(b => b.classList.remove('selected'));
     }
+  }
+
+  function getNoteValue() {
+    return els.noteInput ? els.noteInput.value.trim() : '';
   }
 
   function addEntry() {
@@ -598,7 +595,7 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
     };
 
     if (selectedType === 'kaka') {
-      const note = els.noteInput ? els.noteInput.value.trim() : '';
+      const note = getNoteValue();
       if (note) entry.note = note;
     }
 
@@ -616,7 +613,8 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
 
     spawnConfetti();
     const cfg = TYPE_CONFIG[selectedType];
-    showToast(`${cfg.emoji} ${cfg.label} kaydedildi!`);
+    const noteMsg = selectedType === 'kaka' && entry.note ? ' · ' + entry.note : '';
+    showToast(`${cfg.emoji} ${cfg.label} kaydedildi${noteMsg}!`);
     renderHeader();
     renderStats();
     renderTimeline();
@@ -724,7 +722,8 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
   });
 
   document.querySelectorAll('.preset-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
       document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
       btn.classList.add('selected');
       selectedPreset = parseInt(btn.dataset.ml, 10);
@@ -742,13 +741,18 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
       e.preventDefault();
       document.querySelectorAll('.note-preset-btn').forEach(b => b.classList.remove('selected'));
       btn.classList.add('selected');
-      if (els.noteInput) els.noteInput.value = btn.dataset.note;
+      if (els.noteInput) {
+        els.noteInput.value = btn.dataset.note;
+        els.noteInput.focus();
+      }
     });
   });
 
-  els.noteInput.addEventListener('input', () => {
-    document.querySelectorAll('.note-preset-btn').forEach(b => b.classList.remove('selected'));
-  });
+  if (els.noteInput) {
+    els.noteInput.addEventListener('input', () => {
+      document.querySelectorAll('.note-preset-btn').forEach(b => b.classList.remove('selected'));
+    });
+  }
 
   els.addBtn.addEventListener('click', addEntry);
   els.reportBtn.addEventListener('click', showTodayReport);
@@ -756,8 +760,6 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
   els.settingsBtn.addEventListener('click', () => {
     const settings = loadSettings();
     els.babyNameInput.value = settings.babyName || '';
-    els.birthDateInput.value = settings.birthDate || DEFAULT_SETTINGS.birthDate;
-    els.geminiKeyInput.value = settings.geminiApiKey || '';
     els.settingsModal.hidden = false;
   });
 
@@ -767,11 +769,7 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
   });
 
   els.saveSettings.addEventListener('click', () => {
-    saveSettingsData({
-      babyName: els.babyNameInput.value.trim(),
-      birthDate: els.birthDateInput.value || DEFAULT_SETTINGS.birthDate,
-      geminiApiKey: els.geminiKeyInput.value.trim()
-    });
+    saveSettingsData({ babyName: els.babyNameInput.value.trim() });
     els.settingsModal.hidden = true;
     showToast('Ayarlar kaydedildi! ⚙️');
     renderHeader();
@@ -790,7 +788,6 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
   // --- Init ---
 
   importSeedIfNeeded();
-  migrateSettingsIfNeeded();
   setCurrentTime();
   updateAmountVisibility();
   renderAll();

@@ -77,25 +77,25 @@
     <section class="quick-add card">
       <h2 class="section-title">✨ Hızlı Ekle</h2>
       <div class="type-tabs">
-        <button class="type-tab active" data-type="sut">🍼 Süt</button>
-        <button class="type-tab" data-type="mama">🍶 Mama</button>
-        <button class="type-tab" data-type="kaka">💩 Bez</button>
+        <button type="button" class="type-tab active" data-type="sut">🍼 Süt</button>
+        <button type="button" class="type-tab" data-type="mama">🍶 Mama</button>
+        <button type="button" class="type-tab" data-type="kaka">💩 Bez</button>
       </div>
 
-      <div class="amount-section" id="amountSection">
+      <div class="feed-panel" id="feedPanel">
         <label class="field-label">Miktar (ml)</label>
         <div class="amount-presets">
-          <button class="preset-btn" data-ml="30">30</button>
-          <button class="preset-btn" data-ml="60">60</button>
-          <button class="preset-btn" data-ml="90">90</button>
-          <button class="preset-btn" data-ml="120">120</button>
-          <button class="preset-btn" data-ml="150">150</button>
-          <button class="preset-btn" data-ml="180">180</button>
+          <button type="button" class="preset-btn" data-ml="30">30</button>
+          <button type="button" class="preset-btn" data-ml="60">60</button>
+          <button type="button" class="preset-btn" data-ml="90">90</button>
+          <button type="button" class="preset-btn" data-ml="120">120</button>
+          <button type="button" class="preset-btn" data-ml="150">150</button>
+          <button type="button" class="preset-btn" data-ml="180">180</button>
         </div>
         <input type="number" id="amountInput" class="input" placeholder="veya miktar gir..." min="1" max="500" inputmode="numeric">
       </div>
 
-      <div class="note-section" id="noteSection" style="display:none">
+      <div class="bez-panel" id="bezPanel" hidden>
         <label class="field-label" for="noteInput">Bez Açıklaması</label>
         <div class="note-presets">
           <button type="button" class="note-preset-btn" data-note="kaka+çiş">kaka+çiş</button>
@@ -104,7 +104,7 @@
           <button type="button" class="note-preset-btn" data-note="az kaka">az kaka</button>
           <button type="button" class="note-preset-btn" data-note="bol kaka">bol kaka</button>
         </div>
-        <input type="text" id="noteInput" class="input" placeholder="örn: 1 bez kaka+çiş, yeşil..." maxlength="80">
+        <textarea id="noteInput" class="input textarea-input" rows="2" placeholder="örn: kaka+çiş, yeşil renk..." maxlength="120"></textarea>
       </div>
 
       <div class="time-section">
@@ -112,7 +112,7 @@
         <input type="time" id="timeInput" class="input">
       </div>
 
-      <button class="btn-primary" id="addBtn">
+      <button type="button" class="btn-primary" id="addBtn">
         <span class="btn-emoji">➕</span> Kaydet
       </button>
     </section>
@@ -147,11 +147,7 @@
       <div class="modal-body">
         <label class="field-label">Bebeğin Adı</label>
         <input type="text" id="babyNameInput" class="input" placeholder="Örn: Ediz" maxlength="30">
-        <label class="field-label">Doğum Tarihi</label>
-        <input type="date" id="birthDateInput" class="input">
-        <label class="field-label">Gemini API Anahtarı</label>
-        <input type="password" id="geminiKeyInput" class="input" placeholder="Google AI Studio anahtarı" autocomplete="off">
-        <p class="hint">Beslenme kayıtları telefonunuzda kalır. Tavsiye alırken yalnızca günlük özet Gemini'ye gönderilir. API anahtarı cihazınızda saklanır.</p>
+        <p class="hint">Beslenme kayıtları telefonunuzda saklanır. Doğum tarihi ve AI ayarları sabittir.</p>
       </div>
       <div class="modal-footer">
         <button class="btn-primary" id="saveSettings">Kaydet</button>
