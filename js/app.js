@@ -12,11 +12,9 @@
   };
   const FIXED_BIRTH_DATE = DEFAULT_SETTINGS.birthDate;
   const FIXED_GEMINI_KEY = DEFAULT_SETTINGS.geminiApiKey;
-  // Kota tablosuna göre: önce RPD sınırsız modeller
+  // 2.0 modelleri kotada limit:0 — kullanılmıyor
   const GEMINI_MODELS = [
     'gemini-2.5-flash-lite',
-    'gemini-2.0-flash-lite',
-    'gemini-2.0-flash',
     'gemini-2.5-flash',
     'gemini-3.1-flash-lite',
     'gemini-3-flash'
@@ -373,7 +371,17 @@
         'Son 3 gün ortalamasına (' + avgTotal + ' ml) yakın.')
       : '';
 
-    return '📊 BUGÜNKÜ DEĞERLENDİRME\n' + evalText + ' ' + feedText + ' ' + trend + '\n\n💡 GÜNLÜK TAVSİYE\n' + name + ' ' + age.weeks + ' hafta ' + age.remainDays + ' günlük. Kayıtları düzenli tutmaya devam edin. Beslenmeler arası 2-3 saat genelde uygundur.\n\n💩 BEZ/KAKA NOTU\n' + bezText + '\n\n🌈 MORAL\nHarika takip ediyorsunuz! 💕\n\nℹ️ Yerel tavsiye (AI kotası dolu veya bağlantı yok)';
+    const sutPct = stats.total ? Math.round((stats.sut / stats.total) * 100) : 0;
+    let mixText = '';
+    if (stats.total > 0) {
+      mixText = ' Bugün ' + stats.sut + ' ml süt (%' + sutPct + ') ve ' + stats.mama + ' ml mama.';
+    }
+
+    return '📊 BUGÜNKÜ DEĞERLENDİRME\n' + evalText + mixText + ' ' + feedText + ' ' + trend +
+      '\n\n💡 GÜNLÜK TAVSİYE\n' + name + ' şu an ' + age.weeks + ' hafta ' + age.remainDays + ' günlük. ' +
+      'Beslenmeler arası 2-3 saat genelde uygundur. Emzirme sonrası takviye mama verirken bebeğin doyduğunu gözlemleyin. Kayıtları düzenli tutmanız harika!\n\n' +
+      '💩 BEZ/KAKA NOTU\n' + bezText +
+      '\n\n🌈 MORAL\n' + name + ' için harika bir ebeveynsiniz, böyle devam! 💕';
   }
 
   function loadLastSuccessAdvice() {
@@ -391,96 +399,76 @@
 
   async function callGeminiApi(apiKey, prompt) {
     let lastError = null;
+    const body = JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.7, maxOutputTokens: 512 }
+    });
+
     for (let i = 0; i < GEMINI_MODELS.length; i++) {
       const model = GEMINI_MODELS[i];
-      const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + encodeURIComponent(apiKey);
-      try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 512 }
-          })
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(function () { return {}; });
-          lastError = new Error(err.error?.message || 'API hatası (' + res.status + ')');
-          continue;
+      const baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent';
+      const tries = [
+        { url: baseUrl + '?key=' + encodeURIComponent(apiKey), headers: { 'Content-Type': 'application/json' } },
+        { url: baseUrl, headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey } }
+      ];
+
+      for (let t = 0; t < tries.length; t++) {
+        try {
+          const res = await fetch(tries[t].url, {
+            method: 'POST',
+            headers: tries[t].headers,
+            body: body
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(function () { return {}; });
+            const msg = err.error?.message || 'API hatası (' + res.status + ')';
+            if (msg.indexOf('limit: 0') !== -1 || msg.indexOf('quota') !== -1) {
+              lastError = new Error(msg);
+              break;
+            }
+            lastError = new Error(msg);
+            continue;
+          }
+          const data = await res.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) return text;
+          lastError = new Error('Yanıt alınamadı');
+        } catch (e) {
+          lastError = e;
         }
-        const data = await res.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return text;
-        lastError = new Error('Yanıt alınamadı');
-      } catch (e) {
-        lastError = e;
       }
     }
     throw lastError || new Error('Tüm modeller başarısız');
   }
 
-  function showAiFallback(settings, age) {
-    const cached = loadCachedAdvice();
-    const last = loadLastSuccessAdvice();
-    if (cached && cached.text) {
-      showAiAdvice(cached.text);
-      return;
-    }
-    if (last && last.text) {
-      showAiAdvice(last.text + '\n\n———\n⚠️ Güncel AI tavsiyesi alınamadı (kota doldu). Son kayıtlı tavsiye gösteriliyor.');
-      return;
-    }
-    showAiAdvice(buildLocalAdvice(settings, age));
-  }
-
-  async function fetchAiAdvice(forceRefresh) {
+  function trySilentAiAdvice(forceRefresh) {
     const settings = loadSettings();
     const age = getBabyAge(settings.birthDate);
-    if (!settings.geminiApiKey || !age) {
-      showAiAdvice(buildLocalAdvice(settings, age || { days: 0, weeks: 0, remainDays: 0 }));
-      return;
-    }
-
-    const cached = loadCachedAdvice();
-    if (cached && cached.text) {
-      showAiAdvice(cached.text);
-      if (!forceRefresh) return;
-    }
+    if (!settings.geminiApiKey || !age) return;
 
     const now = Date.now();
-    if (forceRefresh && lastApiCallAt && now - lastApiCallAt < AI_MIN_GAP_MS) {
-      if (!cached || !cached.text) showAiFallback(settings, age);
-      return;
+    if (!forceRefresh) {
+      const cached = loadCachedAdvice();
+      if (cached && cached.text) {
+        showAiAdvice(cached.text);
+        return;
+      }
     }
-
+    if (lastApiCallAt && now - lastApiCallAt < AI_MIN_GAP_MS) return;
     if (aiLoading) return;
-    aiLoading = true;
-    if (!cached || !cached.text) showAiLoading();
 
-    try {
-      const prompt = buildAiPrompt(settings, age);
-      const text = await callGeminiApi(settings.geminiApiKey, prompt);
+    aiLoading = true;
+    const prompt = buildAiPrompt(settings, age);
+    callGeminiApi(settings.geminiApiKey, prompt).then(function (text) {
       lastApiCallAt = Date.now();
       saveCachedAdvice(text);
       saveLastSuccessAdvice(text);
       showAiAdvice(text);
-    } catch (err) {
-      showAiFallback(settings, age);
-    } finally {
+    }).catch(function () {
+      /* sessiz — yerel tavsiye zaten gösteriliyor */
+    }).finally(function () {
       aiLoading = false;
-    }
-  }
-
-  function showAiLoading() {
-    els.aiPlaceholder.textContent = '⏳ Tavsiye hazırlanıyor...';
-    els.aiPlaceholder.hidden = false;
-    els.aiContent.hidden = true;
-  }
-
-  function showAiError(msg) {
-    els.aiPlaceholder.textContent = msg;
-    els.aiPlaceholder.hidden = false;
-    els.aiContent.hidden = true;
+    });
   }
 
   function showAiAdvice(text) {
@@ -497,7 +485,8 @@
 
   function renderAiSection() {
     renderBabyAge();
-    fetchAiAdvice(false);
+    updateLocalAdvice();
+    trySilentAiAdvice(false);
   }
 
   function updateLocalAdvice() {
@@ -506,14 +495,10 @@
     if (age) showAiAdvice(buildLocalAdvice(settings, age));
   }
 
-  function refreshAiAdvice() {
-    fetchAiAdvice(true);
-  }
-
   function scheduleAiRefresh() {
     clearTimeout(aiRefreshTimer);
     aiRefreshTimer = setTimeout(function () {
-      fetchAiAdvice(true);
+      trySilentAiAdvice(true);
     }, AI_DEBOUNCE_MS);
   }
 
@@ -522,7 +507,8 @@
       const hour = new Date().getHours();
       if (hour !== lastAdviceHour) {
         lastAdviceHour = hour;
-        fetchAiAdvice(true);
+        updateLocalAdvice();
+        trySilentAiAdvice(true);
       }
     }, 60000);
   }
@@ -867,7 +853,8 @@
     showToast('Ayarlar kaydedildi! ⚙️');
     renderHeader();
     renderBabyAge();
-    refreshAiAdvice();
+    updateLocalAdvice();
+    trySilentAiAdvice(true);
   });
 
   els.closeReport.addEventListener('click', () => { els.reportModal.hidden = true; });
