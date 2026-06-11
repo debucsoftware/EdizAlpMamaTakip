@@ -68,7 +68,7 @@
       <div class="type-tabs">
         <button class="type-tab active" data-type="sut">🍼 Süt</button>
         <button class="type-tab" data-type="mama">🍶 Mama</button>
-        <button class="type-tab" data-type="kaka">💩 Kaka</button>
+        <button class="type-tab" data-type="kaka">💩 Bez</button>
       </div>
 
       <div class="amount-section" id="amountSection">
@@ -82,6 +82,18 @@
           <button class="preset-btn" data-ml="180">180</button>
         </div>
         <input type="number" id="amountInput" class="input" placeholder="veya miktar gir..." min="1" max="500" inputmode="numeric">
+      </div>
+
+      <div class="note-section" id="noteSection" hidden>
+        <label class="field-label">Açıklama</label>
+        <div class="note-presets">
+          <button type="button" class="note-preset-btn" data-note="kaka+çiş">kaka+çiş</button>
+          <button type="button" class="note-preset-btn" data-note="çiş">çiş</button>
+          <button type="button" class="note-preset-btn" data-note="kaka">kaka</button>
+          <button type="button" class="note-preset-btn" data-note="az kaka">az kaka</button>
+          <button type="button" class="note-preset-btn" data-note="bol kaka">bol kaka</button>
+        </div>
+        <input type="text" id="noteInput" class="input" placeholder="örn: 1 bez kaka+çiş, yeşil..." maxlength="80">
       </div>
 
       <div class="time-section">

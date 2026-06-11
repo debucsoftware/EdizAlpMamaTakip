@@ -286,6 +286,32 @@ body {
   background: var(--white);
 }
 
+.note-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.note-preset-btn {
+  padding: 0.45rem 0.75rem;
+  border: 2px solid var(--green);
+  border-radius: 999px;
+  background: var(--white);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.note-preset-btn.selected,
+.note-preset-btn:active {
+  background: var(--green);
+  color: var(--text);
+  border-color: #95d475;
+}
+
 .time-section {
   margin-bottom: 0.5rem;
 }

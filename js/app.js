@@ -36,6 +36,8 @@
     statKaka: document.getElementById('statKaka'),
     encouragement: document.getElementById('encouragement'),
     amountSection: document.getElementById('amountSection'),
+    noteSection: document.getElementById('noteSection'),
+    noteInput: document.getElementById('noteInput'),
     amountInput: document.getElementById('amountInput'),
     timeInput: document.getElementById('timeInput'),
     addBtn: document.getElementById('addBtn'),
@@ -299,10 +301,14 @@
   function updateAmountVisibility() {
     const isKaka = selectedType === 'kaka';
     els.amountSection.hidden = isKaka;
+    els.noteSection.hidden = !isKaka;
     if (isKaka) {
       els.amountInput.value = '';
       selectedPreset = null;
       document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
+    } else {
+      els.noteInput.value = '';
+      document.querySelectorAll('.note-preset-btn').forEach(b => b.classList.remove('selected'));
     }
   }
 
@@ -333,13 +339,20 @@
       timestamp
     };
 
+    if (selectedType === 'kaka') {
+      const note = els.noteInput.value.trim();
+      if (note) entry.note = note;
+    }
+
     const data = loadData();
     data.entries.push(entry);
     saveData(data);
 
     els.amountInput.value = '';
+    els.noteInput.value = '';
     selectedPreset = null;
     document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
+    document.querySelectorAll('.note-preset-btn').forEach(b => b.classList.remove('selected'));
     setCurrentTime();
 
     spawnConfetti();
@@ -454,6 +467,18 @@
   els.amountInput.addEventListener('input', () => {
     selectedPreset = null;
     document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
+  });
+
+  document.querySelectorAll('.note-preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.note-preset-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      els.noteInput.value = btn.dataset.note;
+    });
+  });
+
+  els.noteInput.addEventListener('input', () => {
+    document.querySelectorAll('.note-preset-btn').forEach(b => b.classList.remove('selected'));
   });
 
   els.addBtn.addEventListener('click', addEntry);
