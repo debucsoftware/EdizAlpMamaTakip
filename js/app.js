@@ -32,6 +32,8 @@
 
   let selectedType = 'sut';
   let selectedPreset = null;
+  let aiLoading = false;
+  let lastAdviceHour = new Date().getHours();
 
   // DOM
   const els = {
@@ -65,7 +67,6 @@
     babyAge: document.getElementById('babyAge'),
     aiPlaceholder: document.getElementById('aiPlaceholder'),
     aiContent: document.getElementById('aiContent'),
-    aiAdviceBtn: document.getElementById('aiAdviceBtn'),
     birthDateInput: document.getElementById('birthDateInput'),
     geminiKeyInput: document.getElementById('geminiKeyInput')
   };
@@ -266,10 +267,11 @@
   }
 
   function getAiCacheKey() {
+    const hour = new Date().getHours();
     const data = loadData();
     const todayEntries = getEntriesForDate(data.entries, todayKey());
     const stats = calcStats(todayEntries);
-    return AI_CACHE_PREFIX + todayKey() + '_' + stats.total + '_' + stats.kaka + '_' + todayEntries.length;
+    return AI_CACHE_PREFIX + todayKey() + '_h' + hour + '_' + stats.total + '_' + stats.kaka + '_' + todayEntries.length;
   }
 
   function loadCachedAdvice() {
@@ -343,13 +345,12 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
   async function fetchAiAdvice(forceRefresh) {
     const settings = loadSettings();
     if (!settings.geminiApiKey) {
-      showToast('⚙️ Ayarlardan Gemini API anahtarı girin');
-      els.settingsModal.hidden = false;
+      showAiError('⚙️ Gemini API anahtarı ayarlarda tanımlı değil.');
       return;
     }
     const age = getBabyAge(settings.birthDate);
     if (!age) {
-      showToast('⚙️ Doğum tarihini ayarlayın');
+      showAiError('⚙️ Doğum tarihi ayarlanmamış.');
       return;
     }
 
@@ -361,8 +362,9 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
       }
     }
 
-    els.aiAdviceBtn.disabled = true;
-    els.aiAdviceBtn.textContent = '⏳ Hazırlanıyor...';
+    if (aiLoading) return;
+    aiLoading = true;
+    showAiLoading();
 
     try {
       const prompt = buildAiPrompt(settings, age);
@@ -387,13 +389,23 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
 
       saveCachedAdvice(text);
       showAiAdvice(text);
-      showToast('Tavsiye hazır! 🌟');
     } catch (err) {
-      showToast('Hata: ' + (err.message || 'Bağlantı sorunu'));
+      showAiError('Tavsiye yüklenemedi: ' + (err.message || 'Bağlantı sorunu'));
     } finally {
-      els.aiAdviceBtn.disabled = false;
-      els.aiAdviceBtn.textContent = '✨ Tavsiye Al';
+      aiLoading = false;
     }
+  }
+
+  function showAiLoading() {
+    els.aiPlaceholder.textContent = '⏳ Tavsiye hazırlanıyor...';
+    els.aiPlaceholder.hidden = false;
+    els.aiContent.hidden = true;
+  }
+
+  function showAiError(msg) {
+    els.aiPlaceholder.textContent = msg;
+    els.aiPlaceholder.hidden = false;
+    els.aiContent.hidden = true;
   }
 
   function showAiAdvice(text) {
@@ -410,13 +422,22 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
 
   function renderAiSection() {
     renderBabyAge();
-    const cached = loadCachedAdvice();
-    if (cached && cached.text) {
-      showAiAdvice(cached.text);
-    } else {
-      els.aiContent.hidden = true;
-      els.aiPlaceholder.hidden = false;
-    }
+    fetchAiAdvice(false);
+  }
+
+  function refreshAiAdvice() {
+    clearAiCache();
+    fetchAiAdvice(true);
+  }
+
+  function startHourlyAdviceRefresh() {
+    setInterval(function () {
+      const hour = new Date().getHours();
+      if (hour !== lastAdviceHour) {
+        lastAdviceHour = hour;
+        refreshAiAdvice();
+      }
+    }, 60000);
   }
 
   // --- Render ---
@@ -596,7 +617,11 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
     spawnConfetti();
     const cfg = TYPE_CONFIG[selectedType];
     showToast(`${cfg.emoji} ${cfg.label} kaydedildi!`);
-    renderAll();
+    renderHeader();
+    renderStats();
+    renderTimeline();
+    renderHistory();
+    refreshAiAdvice();
   }
 
   function deleteEntry(id) {
@@ -606,7 +631,11 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
     saveData(data);
     clearAiCache();
     showToast('Kayıt silindi');
-    renderAll();
+    renderHeader();
+    renderStats();
+    renderTimeline();
+    renderHistory();
+    refreshAiAdvice();
   }
 
   function generateReport(dateKey) {
@@ -723,7 +752,6 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
 
   els.addBtn.addEventListener('click', addEntry);
   els.reportBtn.addEventListener('click', showTodayReport);
-  els.aiAdviceBtn.addEventListener('click', () => fetchAiAdvice(true));
 
   els.settingsBtn.addEventListener('click', () => {
     const settings = loadSettings();
@@ -748,6 +776,7 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
     showToast('Ayarlar kaydedildi! ⚙️');
     renderHeader();
     renderBabyAge();
+    refreshAiAdvice();
   });
 
   els.closeReport.addEventListener('click', () => { els.reportModal.hidden = true; });
@@ -765,4 +794,5 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
   setCurrentTime();
   updateAmountVisibility();
   renderAll();
+  startHourlyAdviceRefresh();
 })();
