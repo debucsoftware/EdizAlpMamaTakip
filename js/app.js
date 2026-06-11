@@ -12,7 +12,18 @@
   };
   const FIXED_BIRTH_DATE = DEFAULT_SETTINGS.birthDate;
   const FIXED_GEMINI_KEY = DEFAULT_SETTINGS.geminiApiKey;
-  const GEMINI_MODEL = 'gemini-2.0-flash';
+  // Kota tablosuna göre: önce RPD sınırsız modeller
+  const GEMINI_MODELS = [
+    'gemini-2.5-flash-lite',
+    'gemini-2.0-flash-lite',
+    'gemini-2.0-flash',
+    'gemini-2.5-flash',
+    'gemini-3.1-flash-lite',
+    'gemini-3-flash'
+  ];
+  const AI_LAST_SUCCESS_KEY = 'bebistakip_ai_last_success';
+  const AI_DEBOUNCE_MS = 30 * 1000;
+  const AI_MIN_GAP_MS = 2 * 60 * 1000;
 
   const TYPE_CONFIG = {
     sut: { emoji: '🍼', label: 'Süt', color: 'sut' },
@@ -36,6 +47,8 @@
   let selectedPreset = null;
   let aiLoading = false;
   let lastAdviceHour = new Date().getHours();
+  let lastApiCallAt = 0;
+  let aiRefreshTimer = null;
 
   // DOM
   const els = {
@@ -294,97 +307,165 @@
     const stats = calcStats(todayEntries);
     const recent = getRecentDayStats(3);
     const name = settings.babyName.trim() || 'Bebek';
-    const summary = getTodaySummaryText() || 'Henüz bugün kayıt yok.';
+    const recentText = recent.map(d => d.total + 'ml').join(', ') || 'yok';
 
-    const recentText = recent.map(d => {
-      return `- ${d.date}: ${d.sut}ml süt, ${d.mama}ml mama, toplam ${d.total}ml, ${d.kaka} bez, ${d.feedCount} beslenme`;
-    }).join('\n');
+    return name + ', ' + age.days + ' günlük bebek. Bugün: süt ' + stats.sut + 'ml, mama ' + stats.mama + 'ml, toplam ' + stats.total + 'ml, ' + stats.feedCount + ' beslenme, ' + stats.kaka + ' bez. Son 3 gün toplamları: ' + recentText + '.\nTürkçe, sıcak, max 150 kelime. Başlıklar: 📊 Değerlendirme, 💡 Tavsiye, 💩 Bez, 🌈 Moral. Teşhis koyma, endişede doktora yönlendir.';
+  }
 
-    return `Sen deneyimli bir yenidoğan beslenme danışmanısın. Türkçe, sıcak ve anlaşılır yaz. Ebeveynlere moral ver ama abartılı övgüden kaçın.
+  function buildLocalAdvice(settings, age) {
+    const data = loadData();
+    const stats = calcStats(getEntriesForDate(data.entries, todayKey()));
+    const name = settings.babyName.trim() || 'Bebek';
+    const recent = getRecentDayStats(3);
+    const avgTotal = recent.length
+      ? Math.round(recent.reduce(function (s, d) { return s + d.total; }, 0) / recent.length)
+      : 0;
 
-BEBEK: ${name}
-DOĞUM: ${settings.birthDate}
-YAŞ: ${age.days} günlük (${age.weeks} hafta ${age.remainDays} gün)
+    let minMl = 450;
+    let maxMl = 750;
+    let feedTarget = '6-10';
+    if (age.weeks < 2) {
+      minMl = 350;
+      maxMl = 550;
+      feedTarget = '8-12';
+    } else if (age.weeks < 4) {
+      minMl = 500;
+      maxMl = 800;
+      feedTarget = '7-10';
+    } else if (age.weeks < 8) {
+      minMl = 600;
+      maxMl = 900;
+      feedTarget = '6-9';
+    }
 
-BUGÜNÜN ÖZETİ (${todayKey()}):
-- Anne sütü: ${stats.sut} ml
-- Mama: ${stats.mama} ml
-- Toplam sıvı: ${stats.total} ml
-- Bez değişimi: ${stats.kaka} kez
-- Beslenme sayısı: ${stats.feedCount}
+    let evalText;
+    if (stats.total === 0) {
+      evalText = 'Henüz bugün beslenme kaydı yok. Kayıt girdikçe değerlendirme güncellenecek.';
+    } else if (stats.total < minMl) {
+      evalText = 'Bugün toplam ' + stats.total + ' ml — yaşı için beklenen aralığın (' + minMl + '-' + maxMl + ' ml) altında.';
+    } else if (stats.total > maxMl) {
+      evalText = 'Bugün toplam ' + stats.total + ' ml — üst sınıra yakın veya üzerinde. Bebeğin tok ve rahat olduğunu gözlemleyin.';
+    } else {
+      evalText = 'Bugün toplam ' + stats.total + ' ml — ' + age.weeks + ' haftalık bebek için uygun aralıkta (' + minMl + '-' + maxMl + ' ml).';
+    }
 
-BUGÜNÜN DETAYLI KAYITLARI:
-${summary}
+    let feedText;
+    if (stats.feedCount === 0) {
+      feedText = 'Beslenme kaydı bekleniyor.';
+    } else if (stats.feedCount < 5) {
+      feedText = stats.feedCount + ' beslenme var. Bu yaşta genelde günde ' + feedTarget + ' beslenme hedeflenir.';
+    } else {
+      feedText = stats.feedCount + ' beslenme ile sıklık normal görünüyor (hedef: ' + feedTarget + '/gün).';
+    }
 
-SON 3 GÜN ORTALAMA/KARŞILAŞTIRMA:
-${recentText || 'Geçmiş kayıt yok'}
+    let bezText;
+    if (stats.kaka === 0) {
+      bezText = 'Henüz bez kaydı yok. Günde 4-6 ıslak bez genelde iyidir.';
+    } else if (stats.kaka < 4) {
+      bezText = stats.kaka + ' bez kaydı — takibe devam edin.';
+    } else {
+      bezText = stats.kaka + ' bez değişimi — bu yaş için normal aralıkta.';
+    }
 
-Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
+    const trend = avgTotal && stats.total
+      ? (stats.total > avgTotal * 1.15 ? 'Son günlere göre bugün daha yüksek.' :
+        stats.total < avgTotal * 0.85 ? 'Son günlere göre bugün daha düşük.' :
+        'Son 3 gün ortalamasına (' + avgTotal + ' ml) yakın.')
+      : '';
 
-📊 BUGÜNKÜ DEĞERLENDİRME
-(Yaşına göre bugünkü süt+mama miktarı yeterli mi, fazla mı, az mı? Beslenme sıklığı normal mi?)
+    return '📊 BUGÜNKÜ DEĞERLENDİRME\n' + evalText + ' ' + feedText + ' ' + trend + '\n\n💡 GÜNLÜK TAVSİYE\n' + name + ' ' + age.weeks + ' hafta ' + age.remainDays + ' günlük. Kayıtları düzenli tutmaya devam edin. Beslenmeler arası 2-3 saat genelde uygundur.\n\n💩 BEZ/KAKA NOTU\n' + bezText + '\n\n🌈 MORAL\nHarika takip ediyorsunuz! 💕\n\nℹ️ Yerel tavsiye (AI kotası dolu veya bağlantı yok)';
+  }
 
-💡 GÜNLÜK TAVSİYE
-(Yaşına uygun pratik öneriler: beslenme aralığı, miktar, emzirme/biberon ipuçları)
+  function loadLastSuccessAdvice() {
+    try {
+      const raw = localStorage.getItem(AI_LAST_SUCCESS_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
 
-💩 BEZ/KAKA NOTU
-(Bez sıklığı ve varsa notlara göre kısa yorum)
+  function saveLastSuccessAdvice(text) {
+    localStorage.setItem(AI_LAST_SUCCESS_KEY, JSON.stringify({ text: text, at: Date.now() }));
+  }
 
-🌈 MORAL
-(Kısa, samimi bir cümle)
+  async function callGeminiApi(apiKey, prompt) {
+    let lastError = null;
+    for (let i = 0; i < GEMINI_MODELS.length; i++) {
+      const model = GEMINI_MODELS[i];
+      const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + encodeURIComponent(apiKey);
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 512 }
+          })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(function () { return {}; });
+          lastError = new Error(err.error?.message || 'API hatası (' + res.status + ')');
+          continue;
+        }
+        const data = await res.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return text;
+        lastError = new Error('Yanıt alınamadı');
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    throw lastError || new Error('Tüm modeller başarısız');
+  }
 
-ÖNEMLİ: Tıbbi teşhis koyma. Endişe gerektiren durum varsa doktora danışmalarını söyle.`;
+  function showAiFallback(settings, age) {
+    const cached = loadCachedAdvice();
+    const last = loadLastSuccessAdvice();
+    if (cached && cached.text) {
+      showAiAdvice(cached.text);
+      return;
+    }
+    if (last && last.text) {
+      showAiAdvice(last.text + '\n\n———\n⚠️ Güncel AI tavsiyesi alınamadı (kota doldu). Son kayıtlı tavsiye gösteriliyor.');
+      return;
+    }
+    showAiAdvice(buildLocalAdvice(settings, age));
   }
 
   async function fetchAiAdvice(forceRefresh) {
     const settings = loadSettings();
-    if (!settings.geminiApiKey) {
-      showAiError('⚙️ Gemini API anahtarı ayarlarda tanımlı değil.');
-      return;
-    }
     const age = getBabyAge(settings.birthDate);
-    if (!age) {
-      showAiError('⚙️ Doğum tarihi ayarlanmamış.');
+    if (!settings.geminiApiKey || !age) {
+      showAiAdvice(buildLocalAdvice(settings, age || { days: 0, weeks: 0, remainDays: 0 }));
       return;
     }
 
-    if (!forceRefresh) {
-      const cached = loadCachedAdvice();
-      if (cached && cached.text) {
-        showAiAdvice(cached.text);
-        return;
-      }
+    const cached = loadCachedAdvice();
+    if (cached && cached.text) {
+      showAiAdvice(cached.text);
+      if (!forceRefresh) return;
+    }
+
+    const now = Date.now();
+    if (forceRefresh && lastApiCallAt && now - lastApiCallAt < AI_MIN_GAP_MS) {
+      if (!cached || !cached.text) showAiFallback(settings, age);
+      return;
     }
 
     if (aiLoading) return;
     aiLoading = true;
-    showAiLoading();
+    if (!cached || !cached.text) showAiLoading();
 
     try {
       const prompt = buildAiPrompt(settings, age);
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(settings.geminiApiKey)}`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
-        })
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error?.message || 'API hatası (' + res.status + ')');
-      }
-
-      const data = await res.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) throw new Error('Yanıt alınamadı');
-
+      const text = await callGeminiApi(settings.geminiApiKey, prompt);
+      lastApiCallAt = Date.now();
       saveCachedAdvice(text);
+      saveLastSuccessAdvice(text);
       showAiAdvice(text);
     } catch (err) {
-      showAiError('Tavsiye yüklenemedi: ' + (err.message || 'Bağlantı sorunu'));
+      showAiFallback(settings, age);
     } finally {
       aiLoading = false;
     }
@@ -419,9 +500,21 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
     fetchAiAdvice(false);
   }
 
+  function updateLocalAdvice() {
+    const settings = loadSettings();
+    const age = getBabyAge(settings.birthDate);
+    if (age) showAiAdvice(buildLocalAdvice(settings, age));
+  }
+
   function refreshAiAdvice() {
-    clearAiCache();
     fetchAiAdvice(true);
+  }
+
+  function scheduleAiRefresh() {
+    clearTimeout(aiRefreshTimer);
+    aiRefreshTimer = setTimeout(function () {
+      fetchAiAdvice(true);
+    }, AI_DEBOUNCE_MS);
   }
 
   function startHourlyAdviceRefresh() {
@@ -429,7 +522,7 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
       const hour = new Date().getHours();
       if (hour !== lastAdviceHour) {
         lastAdviceHour = hour;
-        refreshAiAdvice();
+        fetchAiAdvice(true);
       }
     }, 60000);
   }
@@ -603,7 +696,6 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
     data.entries.push(entry);
     saveData(data);
 
-    clearAiCache();
     els.amountInput.value = '';
     if (els.noteInput) els.noteInput.value = '';
     selectedPreset = null;
@@ -619,7 +711,8 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
     renderStats();
     renderTimeline();
     renderHistory();
-    refreshAiAdvice();
+    updateLocalAdvice();
+    scheduleAiRefresh();
   }
 
   function deleteEntry(id) {
@@ -627,13 +720,13 @@ Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
     const data = loadData();
     data.entries = data.entries.filter(e => e.id !== id);
     saveData(data);
-    clearAiCache();
     showToast('Kayıt silindi');
     renderHeader();
     renderStats();
     renderTimeline();
     renderHistory();
-    refreshAiAdvice();
+    updateLocalAdvice();
+    scheduleAiRefresh();
   }
 
   function generateReport(dateKey) {
