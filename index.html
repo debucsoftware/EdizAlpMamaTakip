@@ -62,6 +62,18 @@
       <p class="encouragement" id="encouragement"></p>
     </section>
 
+    <!-- AI Tavsiye -->
+    <section class="ai-card card">
+      <div class="ai-header">
+        <h2 class="section-title">🌟 Günlük Tavsiye</h2>
+        <span class="baby-age" id="babyAge"></span>
+      </div>
+      <p class="ai-placeholder" id="aiPlaceholder">Bugünkü süt/mama miktarını yaşına göre değerlendirmek için tavsiye al.</p>
+      <div class="ai-content" id="aiContent" hidden></div>
+      <button class="btn-ai" id="aiAdviceBtn" type="button">✨ Tavsiye Al</button>
+      <p class="ai-disclaimer">ℹ️ Bilgilendirme amaçlıdır, doktor tavsiyesi yerine geçmez.</p>
+    </section>
+
     <!-- Hızlı Ekleme -->
     <section class="quick-add card">
       <h2 class="section-title">✨ Hızlı Ekle</h2>
@@ -84,8 +96,8 @@
         <input type="number" id="amountInput" class="input" placeholder="veya miktar gir..." min="1" max="500" inputmode="numeric">
       </div>
 
-      <div class="note-section" id="noteSection" hidden>
-        <label class="field-label">Açıklama</label>
+      <div class="note-section" id="noteSection" style="display:none">
+        <label class="field-label" for="noteInput">Bez Açıklaması</label>
         <div class="note-presets">
           <button type="button" class="note-preset-btn" data-note="kaka+çiş">kaka+çiş</button>
           <button type="button" class="note-preset-btn" data-note="çiş">çiş</button>
@@ -135,8 +147,12 @@
       </div>
       <div class="modal-body">
         <label class="field-label">Bebeğin Adı</label>
-        <input type="text" id="babyNameInput" class="input" placeholder="Örn: Minik Prenses" maxlength="30">
-        <p class="hint">Verileriniz telefonunuzda saklanır, sunucuya gönderilmez.</p>
+        <input type="text" id="babyNameInput" class="input" placeholder="Örn: Ediz" maxlength="30">
+        <label class="field-label">Doğum Tarihi</label>
+        <input type="date" id="birthDateInput" class="input">
+        <label class="field-label">Gemini API Anahtarı</label>
+        <input type="password" id="geminiKeyInput" class="input" placeholder="Google AI Studio anahtarı" autocomplete="off">
+        <p class="hint">Beslenme kayıtları telefonunuzda kalır. Tavsiye alırken yalnızca günlük özet Gemini'ye gönderilir. API anahtarı cihazınızda saklanır.</p>
       </div>
       <div class="modal-footer">
         <button class="btn-primary" id="saveSettings">Kaydet</button>

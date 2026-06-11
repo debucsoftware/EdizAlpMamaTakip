@@ -419,7 +419,7 @@ entries.forEach(e => {
 });
 
 const out = `/* Ediz geçmiş kayıtları - otomatik üretildi */\nwindow.BEBIS_SEED = ${JSON.stringify({
-  settings: { babyName: 'Ediz' },
+  settings: { babyName: 'Ediz', birthDate: '2026-05-14' },
   entries: entries.sort((a, b) => a.timestamp.localeCompare(b.timestamp))
 })};\n`;
 

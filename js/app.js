@@ -4,6 +4,13 @@
   const STORAGE_KEY = 'bebistakip_data';
   const SETTINGS_KEY = 'bebistakip_settings';
   const SEED_FLAG = 'bebistakip_seed_v1';
+  const AI_CACHE_PREFIX = 'bebistakip_ai_';
+  const DEFAULT_SETTINGS = {
+    babyName: 'Ediz',
+    birthDate: '2026-05-14',
+    geminiApiKey: 'AIzaSyAIJmQruzTNOVvwYbw_80BLI-q3RbqLb1o'
+  };
+  const GEMINI_MODEL = 'gemini-2.0-flash';
 
   const TYPE_CONFIG = {
     sut: { emoji: '🍼', label: 'Süt', color: 'sut' },
@@ -54,7 +61,13 @@
     reportContent: document.getElementById('reportContent'),
     copyReport: document.getElementById('copyReport'),
     shareReport: document.getElementById('shareReport'),
-    toast: document.getElementById('toast')
+    toast: document.getElementById('toast'),
+    babyAge: document.getElementById('babyAge'),
+    aiPlaceholder: document.getElementById('aiPlaceholder'),
+    aiContent: document.getElementById('aiContent'),
+    aiAdviceBtn: document.getElementById('aiAdviceBtn'),
+    birthDateInput: document.getElementById('birthDateInput'),
+    geminiKeyInput: document.getElementById('geminiKeyInput')
   };
 
   // --- Storage ---
@@ -75,10 +88,23 @@
   function loadSettings() {
     try {
       const raw = localStorage.getItem(SETTINGS_KEY);
-      return raw ? JSON.parse(raw) : { babyName: '' };
+      const parsed = raw ? JSON.parse(raw) : {};
+      const merged = { ...DEFAULT_SETTINGS, ...parsed };
+      if (!merged.geminiApiKey) merged.geminiApiKey = DEFAULT_SETTINGS.geminiApiKey;
+      return merged;
     } catch {
-      return { babyName: '' };
+      return { ...DEFAULT_SETTINGS };
     }
+  }
+
+  function migrateSettingsIfNeeded() {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      if (!parsed.geminiApiKey && DEFAULT_SETTINGS.geminiApiKey) {
+        saveSettingsData({ ...DEFAULT_SETTINGS, ...parsed, geminiApiKey: DEFAULT_SETTINGS.geminiApiKey });
+      }
+    } catch { /* ignore */ }
   }
 
   function saveSettingsData(settings) {
@@ -98,7 +124,7 @@
   function formatEntryDetail(entry) {
     const time = formatTime(entry.timestamp);
     if (entry.type === 'kaka') {
-      return entry.note ? `${time} · ${entry.note}` : time;
+      return entry.note ? time : `${time} · bez değişimi`;
     }
     if (entry.type === 'emdi') {
       return entry.note ? `${time} · ${entry.note}` : time;
@@ -190,6 +216,209 @@
     return ENCOURAGEMENTS[Math.floor(Math.random() * ENCOURAGEMENTS.length)];
   }
 
+  function getBabyAge(birthDate) {
+    if (!birthDate) return null;
+    const birth = new Date(birthDate + 'T12:00:00');
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    const diffMs = today - birth;
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (days < 0) return null;
+    const weeks = Math.floor(days / 7);
+    const remainDays = days % 7;
+    return { days, weeks, remainDays };
+  }
+
+  function formatBabyAge(age) {
+    if (!age) return '';
+    if (age.days === 0) return '0 günlük 👶';
+    if (age.weeks === 0) return `${age.days} günlük 👶`;
+    if (age.remainDays === 0) return `${age.weeks} haftalık 👶`;
+    return `${age.weeks} hafta ${age.remainDays} günlük 👶`;
+  }
+
+  function getRecentDayStats(daysBack) {
+    const data = loadData();
+    const result = [];
+    for (let i = 1; i <= daysBack; i++) {
+      const d = new Date(todayKey() + 'T12:00:00');
+      d.setDate(d.getDate() - i);
+      const key = getDateKeyFromTimestamp(d.toISOString());
+      const entries = getEntriesForDate(data.entries, key);
+      const stats = calcStats(entries);
+      result.push({ date: key, ...stats, feedCount: stats.feedCount });
+    }
+    return result;
+  }
+
+  function getTodaySummaryText() {
+    const data = loadData();
+    const entries = getEntriesForDate(data.entries, todayKey())
+      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    return entries.map(e => {
+      const time = formatTime(e.timestamp);
+      if (e.type === 'kaka') return `${time} bez${e.note ? ' (' + e.note + ')' : ''}`;
+      if (e.type === 'emdi') return `${time} emzirme${e.note ? ' (' + e.note + ')' : ''}`;
+      if (e.type === 'sut') return `${time} ${e.amount}ml süt${e.note ? ' (' + e.note + ')' : ''}`;
+      if (e.type === 'mama') return `${time} ${e.amount}ml mama${e.note ? ' (' + e.note + ')' : ''}`;
+      return time;
+    }).join('\n');
+  }
+
+  function getAiCacheKey() {
+    const data = loadData();
+    const todayEntries = getEntriesForDate(data.entries, todayKey());
+    const stats = calcStats(todayEntries);
+    return AI_CACHE_PREFIX + todayKey() + '_' + stats.total + '_' + stats.kaka + '_' + todayEntries.length;
+  }
+
+  function loadCachedAdvice() {
+    try {
+      const key = getAiCacheKey();
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function saveCachedAdvice(text) {
+    localStorage.setItem(getAiCacheKey(), JSON.stringify({ text, at: Date.now() }));
+  }
+
+  function clearAiCache() {
+    Object.keys(localStorage).filter(k => k.startsWith(AI_CACHE_PREFIX)).forEach(k => {
+      localStorage.removeItem(k);
+    });
+  }
+
+  function buildAiPrompt(settings, age) {
+    const data = loadData();
+    const todayEntries = getEntriesForDate(data.entries, todayKey());
+    const stats = calcStats(todayEntries);
+    const recent = getRecentDayStats(3);
+    const name = settings.babyName.trim() || 'Bebek';
+    const summary = getTodaySummaryText() || 'Henüz bugün kayıt yok.';
+
+    const recentText = recent.map(d => {
+      return `- ${d.date}: ${d.sut}ml süt, ${d.mama}ml mama, toplam ${d.total}ml, ${d.kaka} bez, ${d.feedCount} beslenme`;
+    }).join('\n');
+
+    return `Sen deneyimli bir yenidoğan beslenme danışmanısın. Türkçe, sıcak ve anlaşılır yaz. Ebeveynlere moral ver ama abartılı övgüden kaçın.
+
+BEBEK: ${name}
+DOĞUM: ${settings.birthDate}
+YAŞ: ${age.days} günlük (${age.weeks} hafta ${age.remainDays} gün)
+
+BUGÜNÜN ÖZETİ (${todayKey()}):
+- Anne sütü: ${stats.sut} ml
+- Mama: ${stats.mama} ml
+- Toplam sıvı: ${stats.total} ml
+- Bez değişimi: ${stats.kaka} kez
+- Beslenme sayısı: ${stats.feedCount}
+
+BUGÜNÜN DETAYLI KAYITLARI:
+${summary}
+
+SON 3 GÜN ORTALAMA/KARŞILAŞTIRMA:
+${recentText || 'Geçmiş kayıt yok'}
+
+Lütfen şu başlıklarla kısa ve net yanıt ver (toplam 150-250 kelime):
+
+📊 BUGÜNKÜ DEĞERLENDİRME
+(Yaşına göre bugünkü süt+mama miktarı yeterli mi, fazla mı, az mı? Beslenme sıklığı normal mi?)
+
+💡 GÜNLÜK TAVSİYE
+(Yaşına uygun pratik öneriler: beslenme aralığı, miktar, emzirme/biberon ipuçları)
+
+💩 BEZ/KAKA NOTU
+(Bez sıklığı ve varsa notlara göre kısa yorum)
+
+🌈 MORAL
+(Kısa, samimi bir cümle)
+
+ÖNEMLİ: Tıbbi teşhis koyma. Endişe gerektiren durum varsa doktora danışmalarını söyle.`;
+  }
+
+  async function fetchAiAdvice(forceRefresh) {
+    const settings = loadSettings();
+    if (!settings.geminiApiKey) {
+      showToast('⚙️ Ayarlardan Gemini API anahtarı girin');
+      els.settingsModal.hidden = false;
+      return;
+    }
+    const age = getBabyAge(settings.birthDate);
+    if (!age) {
+      showToast('⚙️ Doğum tarihini ayarlayın');
+      return;
+    }
+
+    if (!forceRefresh) {
+      const cached = loadCachedAdvice();
+      if (cached && cached.text) {
+        showAiAdvice(cached.text);
+        return;
+      }
+    }
+
+    els.aiAdviceBtn.disabled = true;
+    els.aiAdviceBtn.textContent = '⏳ Hazırlanıyor...';
+
+    try {
+      const prompt = buildAiPrompt(settings, age);
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(settings.geminiApiKey)}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message || 'API hatası (' + res.status + ')');
+      }
+
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) throw new Error('Yanıt alınamadı');
+
+      saveCachedAdvice(text);
+      showAiAdvice(text);
+      showToast('Tavsiye hazır! 🌟');
+    } catch (err) {
+      showToast('Hata: ' + (err.message || 'Bağlantı sorunu'));
+    } finally {
+      els.aiAdviceBtn.disabled = false;
+      els.aiAdviceBtn.textContent = '✨ Tavsiye Al';
+    }
+  }
+
+  function showAiAdvice(text) {
+    els.aiContent.textContent = text;
+    els.aiContent.hidden = false;
+    els.aiPlaceholder.hidden = true;
+  }
+
+  function renderBabyAge() {
+    const settings = loadSettings();
+    const age = getBabyAge(settings.birthDate);
+    els.babyAge.textContent = formatBabyAge(age);
+  }
+
+  function renderAiSection() {
+    renderBabyAge();
+    const cached = loadCachedAdvice();
+    if (cached && cached.text) {
+      showAiAdvice(cached.text);
+    } else {
+      els.aiContent.hidden = true;
+      els.aiPlaceholder.hidden = false;
+    }
+  }
+
   // --- Render ---
 
   function renderHeader() {
@@ -224,12 +453,15 @@
     els.timelineList.innerHTML = todayEntries.map(entry => {
       const cfg = TYPE_CONFIG[entry.type];
       const detail = formatEntryDetail(entry);
+      const typeLabel = entry.type === 'kaka' && entry.note
+        ? `${cfg.label} · ${entry.note}`
+        : cfg.label;
 
       return `
         <li class="timeline-item ${cfg.color}">
           <span class="timeline-emoji">${cfg.emoji}</span>
           <div class="timeline-info">
-            <div class="timeline-type">${cfg.label}</div>
+            <div class="timeline-type">${typeLabel}</div>
             <div class="timeline-detail">${detail}</div>
           </div>
           <button class="btn-delete" data-id="${entry.id}" aria-label="Sil">🗑️</button>
@@ -285,6 +517,7 @@
   function renderAll() {
     renderHeader();
     renderStats();
+    renderAiSection();
     renderTimeline();
     renderHistory();
   }
@@ -300,13 +533,17 @@
 
   function updateAmountVisibility() {
     const isKaka = selectedType === 'kaka';
-    els.amountSection.hidden = isKaka;
-    els.noteSection.hidden = !isKaka;
+    if (els.amountSection) {
+      els.amountSection.style.display = isKaka ? 'none' : 'block';
+    }
+    if (els.noteSection) {
+      els.noteSection.style.display = isKaka ? 'block' : 'none';
+    }
     if (isKaka) {
       els.amountInput.value = '';
       selectedPreset = null;
       document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
-    } else {
+    } else if (els.noteInput) {
       els.noteInput.value = '';
       document.querySelectorAll('.note-preset-btn').forEach(b => b.classList.remove('selected'));
     }
@@ -340,7 +577,7 @@
     };
 
     if (selectedType === 'kaka') {
-      const note = els.noteInput.value.trim();
+      const note = els.noteInput ? els.noteInput.value.trim() : '';
       if (note) entry.note = note;
     }
 
@@ -348,8 +585,9 @@
     data.entries.push(entry);
     saveData(data);
 
+    clearAiCache();
     els.amountInput.value = '';
-    els.noteInput.value = '';
+    if (els.noteInput) els.noteInput.value = '';
     selectedPreset = null;
     document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
     document.querySelectorAll('.note-preset-btn').forEach(b => b.classList.remove('selected'));
@@ -366,6 +604,7 @@
     const data = loadData();
     data.entries = data.entries.filter(e => e.id !== id);
     saveData(data);
+    clearAiCache();
     showToast('Kayıt silindi');
     renderAll();
   }
@@ -470,10 +709,11 @@
   });
 
   document.querySelectorAll('.note-preset-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
       document.querySelectorAll('.note-preset-btn').forEach(b => b.classList.remove('selected'));
       btn.classList.add('selected');
-      els.noteInput.value = btn.dataset.note;
+      if (els.noteInput) els.noteInput.value = btn.dataset.note;
     });
   });
 
@@ -483,10 +723,13 @@
 
   els.addBtn.addEventListener('click', addEntry);
   els.reportBtn.addEventListener('click', showTodayReport);
+  els.aiAdviceBtn.addEventListener('click', () => fetchAiAdvice(true));
 
   els.settingsBtn.addEventListener('click', () => {
     const settings = loadSettings();
     els.babyNameInput.value = settings.babyName || '';
+    els.birthDateInput.value = settings.birthDate || DEFAULT_SETTINGS.birthDate;
+    els.geminiKeyInput.value = settings.geminiApiKey || '';
     els.settingsModal.hidden = false;
   });
 
@@ -496,10 +739,15 @@
   });
 
   els.saveSettings.addEventListener('click', () => {
-    saveSettingsData({ babyName: els.babyNameInput.value.trim() });
+    saveSettingsData({
+      babyName: els.babyNameInput.value.trim(),
+      birthDate: els.birthDateInput.value || DEFAULT_SETTINGS.birthDate,
+      geminiApiKey: els.geminiKeyInput.value.trim()
+    });
     els.settingsModal.hidden = true;
     showToast('Ayarlar kaydedildi! ⚙️');
     renderHeader();
+    renderBabyAge();
   });
 
   els.closeReport.addEventListener('click', () => { els.reportModal.hidden = true; });
@@ -513,6 +761,7 @@
   // --- Init ---
 
   importSeedIfNeeded();
+  migrateSettingsIfNeeded();
   setCurrentTime();
   updateAmountVisibility();
   renderAll();
