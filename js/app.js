@@ -134,16 +134,31 @@
 
   // --- Helpers ---
 
+  const DAY_START_HOUR = 8;
+
   function getDateKeyFromTimestamp(isoStr) {
     const d = new Date(isoStr);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
+    const adjusted = new Date(d);
+    if (adjusted.getHours() < DAY_START_HOUR) {
+      adjusted.setDate(adjusted.getDate() - 1);
+    }
+    const y = adjusted.getFullYear();
+    const m = String(adjusted.getMonth() + 1).padStart(2, '0');
+    const day = String(adjusted.getDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
   }
 
   function todayKey() {
     return getDateKeyFromTimestamp(new Date().toISOString());
+  }
+
+  function shiftDateKey(dateKey, deltaDays) {
+    const d = new Date(dateKey + 'T12:00:00');
+    d.setDate(d.getDate() + deltaDays);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }
 
   function formatDate(dateStr) {
@@ -164,9 +179,7 @@
   function formatShortDate(dateStr) {
     const d = new Date(dateStr + 'T12:00:00');
     const today = todayKey();
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayKey = yesterday.toISOString().slice(0, 10);
+    const yesterdayKey = shiftDateKey(today, -1);
 
     if (dateStr === today) return 'Bugün';
     if (dateStr === yesterdayKey) return 'Dün';
@@ -715,9 +728,17 @@
 
   function deleteEntry(id) {
     if (!confirm('Bu kaydı silmek istediğinize emin misiniz?')) return;
-    const data = loadData();
-    data.entries = data.entries.filter(e => e.id !== id);
-    saveData(data);
+    if (!firestoreReady || !window.FirestoreSync) {
+      showToast('Veriler yükleniyor, bekleyin ☁️');
+      return;
+    }
+    window.FirestoreSync.deleteEntry(id).catch(function () {
+      showToast('Kayıt silinemedi ☁️');
+      renderHeader();
+      renderStats();
+      renderTimeline();
+      renderHistory();
+    });
     showToast('Kayıt silindi');
     renderHeader();
     renderStats();
@@ -780,9 +801,7 @@
     const data = loadData();
     const days = [];
     for (let i = 6; i >= 0; i--) {
-      const d = new Date(todayKey() + 'T12:00:00');
-      d.setDate(d.getDate() - i);
-      const key = getDateKeyFromTimestamp(d.toISOString());
+      const key = shiftDateKey(todayKey(), -i);
       const entries = getEntriesForDate(data.entries, key);
       const stats = calcStats(entries);
       days.push({

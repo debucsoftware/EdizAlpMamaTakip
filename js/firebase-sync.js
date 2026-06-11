@@ -18,12 +18,12 @@
   let db = null;
   let unsubscribe = null;
   let ignoreNextSnapshot = false;
-  let lastPushAt = 0;
   let onRemoteUpdateCallback = null;
   let ready = false;
 
   const state = {
     entries: [],
+    deletedIds: [],
     settings: { babyName: DEFAULT_BABY_NAME }
   };
 
@@ -32,13 +32,45 @@
     return window.BEBIS_SEED.entries;
   }
 
+  function uniqueIds(ids) {
+    return Array.from(new Set((ids || []).filter(Boolean)));
+  }
+
+  function mergeEntries(a, b) {
+    const map = new Map();
+    (a || []).concat(b || []).forEach(function (entry) {
+      if (entry && entry.id) map.set(entry.id, entry);
+    });
+    return Array.from(map.values()).sort(function (x, y) {
+      return new Date(x.timestamp) - new Date(y.timestamp);
+    });
+  }
+
+  function filterDeleted(entries, deletedIds) {
+    const deleted = new Set(deletedIds || []);
+    return (entries || []).filter(function (e) { return e && e.id && !deleted.has(e.id); });
+  }
+
+  function mergeRemoteIntoState(remoteEntries, remoteDeletedIds) {
+    state.deletedIds = uniqueIds(state.deletedIds.concat(remoteDeletedIds || []));
+    state.entries = filterDeleted(
+      mergeEntries(state.entries, remoteEntries || []),
+      state.deletedIds
+    );
+  }
+
   function entriesSignature(entries) {
     return (entries || []).map(function (e) { return e.id; }).join(',');
+  }
+
+  function deletedSignature(ids) {
+    return uniqueIds(ids).sort().join(',');
   }
 
   function buildPayload() {
     return {
       entries: state.entries,
+      deletedIds: state.deletedIds,
       settings: { babyName: state.settings.babyName || DEFAULT_BABY_NAME },
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
@@ -46,18 +78,24 @@
 
   function applyRemote(remote) {
     const remoteEntries = remote.entries || [];
+    const remoteDeleted = remote.deletedIds || [];
     const remoteSettings = remote.settings || {};
-    const entriesChanged = entriesSignature(state.entries) !== entriesSignature(remoteEntries);
-    const settingsChanged = (remoteSettings.babyName || DEFAULT_BABY_NAME)
-      !== (state.settings.babyName || DEFAULT_BABY_NAME);
 
-    if (!entriesChanged && !settingsChanged) return false;
+    const prevEntriesSig = entriesSignature(state.entries);
+    const prevDeletedSig = deletedSignature(state.deletedIds);
+    const prevSettings = state.settings.babyName || DEFAULT_BABY_NAME;
 
-    state.entries = remoteEntries;
+    mergeRemoteIntoState(remoteEntries, remoteDeleted);
+
     if (remoteSettings.babyName) {
       state.settings.babyName = remoteSettings.babyName;
     }
-    return true;
+
+    const entriesChanged = prevEntriesSig !== entriesSignature(state.entries);
+    const deletedChanged = prevDeletedSig !== deletedSignature(state.deletedIds);
+    const settingsChanged = (state.settings.babyName || DEFAULT_BABY_NAME) !== prevSettings;
+
+    return entriesChanged || deletedChanged || settingsChanged;
   }
 
   async function bootstrap() {
@@ -66,7 +104,8 @@
 
     if (snap.exists) {
       const remote = snap.data();
-      state.entries = remote.entries || [];
+      state.entries = filterDeleted(remote.entries || [], remote.deletedIds || []);
+      state.deletedIds = uniqueIds(remote.deletedIds || []);
       state.settings.babyName = (remote.settings && remote.settings.babyName) || DEFAULT_BABY_NAME;
       return { entryCount: state.entries.length, uploaded: false };
     }
@@ -74,12 +113,12 @@
     const seedEntries = getSeedEntries();
     const seedSettings = window.BEBIS_SEED && window.BEBIS_SEED.settings;
     state.entries = seedEntries.slice();
+    state.deletedIds = [];
     state.settings.babyName = (seedSettings && seedSettings.babyName) || DEFAULT_BABY_NAME;
 
     ignoreNextSnapshot = true;
-    lastPushAt = Date.now();
     await docRef.set(buildPayload());
-    setTimeout(function () { ignoreNextSnapshot = false; }, 800);
+    setTimeout(function () { ignoreNextSnapshot = false; }, 500);
 
     return {
       entryCount: state.entries.length,
@@ -92,7 +131,6 @@
     unsubscribe = db.collection(DOC_COLLECTION).doc(DOC_ID).onSnapshot(function (snap) {
       if (!snap.exists) return;
       if (ignoreNextSnapshot) return;
-      if (Date.now() - lastPushAt < 1200) return;
 
       const changed = applyRemote(snap.data());
       if (changed && onRemoteUpdateCallback) onRemoteUpdateCallback();
@@ -103,15 +141,20 @@
 
   async function pushToFirestore() {
     if (!db) return;
+    const docRef = db.collection(DOC_COLLECTION).doc(DOC_ID);
+
     try {
-      lastPushAt = Date.now();
       ignoreNextSnapshot = true;
-      await db.collection(DOC_COLLECTION).doc(DOC_ID).set(buildPayload(), { merge: true });
+      const snap = await docRef.get();
+      const remote = snap.exists ? snap.data() : {};
+      mergeRemoteIntoState(remote.entries || [], remote.deletedIds || []);
+
+      await docRef.set(buildPayload(), { merge: true });
     } catch (err) {
       console.error('Firestore kayıt hatası:', err);
       throw err;
     } finally {
-      setTimeout(function () { ignoreNextSnapshot = false; }, 800);
+      setTimeout(function () { ignoreNextSnapshot = false; }, 500);
     }
   }
 
@@ -124,7 +167,16 @@
   }
 
   function saveData(data) {
-    state.entries = (data.entries || []).slice();
+    const incoming = filterDeleted(data.entries || [], state.deletedIds);
+    state.entries = mergeEntries(state.entries, incoming);
+    state.entries = filterDeleted(state.entries, state.deletedIds);
+    return pushToFirestore();
+  }
+
+  function deleteEntry(id) {
+    if (!id) return Promise.resolve();
+    state.deletedIds = uniqueIds(state.deletedIds.concat(id));
+    state.entries = state.entries.filter(function (e) { return e.id !== id; });
     return pushToFirestore();
   }
 
@@ -165,6 +217,7 @@
     getData: getData,
     getSettings: getSettings,
     saveData: saveData,
+    deleteEntry: deleteEntry,
     saveSettings: saveSettings
   };
 })();
