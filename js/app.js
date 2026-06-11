@@ -8,17 +8,15 @@
   const DEFAULT_SETTINGS = {
     babyName: 'Ediz',
     birthDate: '2026-05-14',
-    geminiApiKey: 'AQ.Ab8RN6J6rrhv0TYePFyOmCRSU4D8PPbokXi0_tLLvWugZUQUKA'
+    groqApiKey: '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'
   };
   const FIXED_BIRTH_DATE = DEFAULT_SETTINGS.birthDate;
-  const FIXED_GEMINI_KEY = DEFAULT_SETTINGS.geminiApiKey;
-  // 2.0 modelleri kotada limit:0 — kullanılmıyor
-  const GEMINI_MODELS = [
-    'gemini-2.5-flash-lite',
-    'gemini-2.5-flash',
-    'gemini-3.1-flash-lite',
-    'gemini-3-flash'
+  const FIXED_GROQ_KEY = DEFAULT_SETTINGS.groqApiKey;
+  const GROQ_MODELS = [
+    'llama-3.3-70b-versatile',
+    'llama-3.1-8b-instant'
   ];
+  const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
   const AI_LAST_SUCCESS_KEY = 'bebistakip_ai_last_success';
   const AI_DEBOUNCE_MS = 30 * 1000;
   const AI_MIN_GAP_MS = 2 * 60 * 1000;
@@ -80,7 +78,10 @@
     babyAge: document.getElementById('babyAge'),
     aiPlaceholder: document.getElementById('aiPlaceholder'),
     aiContent: document.getElementById('aiContent'),
-    aiSourceBadge: document.getElementById('aiSourceBadge')
+    aiSourceBadge: document.getElementById('aiSourceBadge'),
+    groqApiTestInput: document.getElementById('groqApiTestInput'),
+    apiTestBtn: document.getElementById('apiTestBtn'),
+    apiTestResult: document.getElementById('apiTestResult')
   };
 
   // --- Storage ---
@@ -105,7 +106,7 @@
       return {
         babyName: parsed.babyName || DEFAULT_SETTINGS.babyName,
         birthDate: FIXED_BIRTH_DATE,
-        geminiApiKey: FIXED_GEMINI_KEY
+        groqApiKey: FIXED_GROQ_KEY
       };
     } catch {
       return { ...DEFAULT_SETTINGS };
@@ -398,54 +399,107 @@
     localStorage.setItem(AI_LAST_SUCCESS_KEY, JSON.stringify({ text: text, at: Date.now() }));
   }
 
-  async function callGeminiApi(apiKey, prompt) {
+  async function callGroqApi(apiKey, prompt) {
     let lastError = null;
-    const body = JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.7, maxOutputTokens: 512 }
-    });
-
-    for (let i = 0; i < GEMINI_MODELS.length; i++) {
-      const model = GEMINI_MODELS[i];
-      const baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent';
-      const tries = [
-        { url: baseUrl + '?key=' + encodeURIComponent(apiKey), headers: { 'Content-Type': 'application/json' } },
-        { url: baseUrl, headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey } }
-      ];
-
-      for (let t = 0; t < tries.length; t++) {
-        try {
-          const res = await fetch(tries[t].url, {
-            method: 'POST',
-            headers: tries[t].headers,
-            body: body
-          });
-          if (!res.ok) {
-            const err = await res.json().catch(function () { return {}; });
-            const msg = err.error?.message || 'API hatası (' + res.status + ')';
-            if (msg.indexOf('limit: 0') !== -1 || msg.indexOf('quota') !== -1) {
-              lastError = new Error(msg);
-              break;
-            }
-            lastError = new Error(msg);
-            continue;
-          }
-          const data = await res.json();
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) return text;
-          lastError = new Error('Yanıt alınamadı');
-        } catch (e) {
-          lastError = e;
+    for (let i = 0; i < GROQ_MODELS.length; i++) {
+      const model = GROQ_MODELS[i];
+      try {
+        const res = await fetch(GROQ_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + apiKey
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [
+              {
+                role: 'system',
+                content: 'Sen deneyimli bir yenidoğan beslenme danışmanısın. Türkçe, sıcak ve anlaşılır yaz. Teşhis koyma.'
+              },
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.7,
+            max_tokens: 512
+          })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(function () { return {}; });
+          lastError = new Error(err.error?.message || 'Groq hatası (' + res.status + ')');
+          continue;
         }
+        const data = await res.json();
+        const text = data.choices?.[0]?.message?.content;
+        if (text) return text.trim();
+        lastError = new Error('Yanıt alınamadı');
+      } catch (e) {
+        lastError = e;
       }
     }
-    throw lastError || new Error('Tüm modeller başarısız');
+    throw lastError || new Error('Groq modelleri başarısız');
+  }
+
+  async function testGroqApiDebug(apiKey) {
+    const lines = [];
+    lines.push('🔑 Anahtar: ' + (apiKey ? apiKey.slice(0, 8) + '...' + apiKey.slice(-4) : 'BOŞ'));
+    lines.push('🌐 URL: ' + GROQ_API_URL);
+    lines.push('⏰ ' + new Date().toLocaleString('tr-TR'));
+    lines.push('—'.repeat(28));
+
+    if (!apiKey) {
+      lines.push('❌ API anahtarı boş!');
+      return lines.join('\n');
+    }
+
+    for (let i = 0; i < GROQ_MODELS.length; i++) {
+      const model = GROQ_MODELS[i];
+      lines.push('\n📦 Model: ' + model);
+      try {
+        const res = await fetch(GROQ_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + apiKey
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [
+              { role: 'user', content: 'Test: tek kelimeyle merhaba de.' }
+            ],
+            max_tokens: 50
+          })
+        });
+        lines.push('📡 HTTP: ' + res.status + ' ' + res.statusText);
+        const raw = await res.text();
+        try {
+          const data = JSON.parse(raw);
+          if (data.choices?.[0]?.message?.content) {
+            lines.push('✅ BAŞARILI');
+            lines.push('Yanıt: ' + data.choices[0].message.content);
+          } else if (data.error) {
+            lines.push('❌ HATA');
+            lines.push(JSON.stringify(data.error, null, 2));
+          } else {
+            lines.push('⚠️ Beklenmeyen yanıt:');
+            lines.push(JSON.stringify(data, null, 2));
+          }
+        } catch {
+          lines.push('⚠️ JSON değil, ham yanıt:');
+          lines.push(raw.slice(0, 800));
+        }
+        if (res.ok) break;
+      } catch (err) {
+        lines.push('❌ FETCH HATASI (CORS/ağ?)');
+        lines.push(String(err.message || err));
+      }
+    }
+    return lines.join('\n');
   }
 
   function trySilentAiAdvice(forceRefresh) {
     const settings = loadSettings();
     const age = getBabyAge(settings.birthDate);
-    if (!settings.geminiApiKey || !age) return;
+    if (!settings.groqApiKey || !age) return;
 
     const now = Date.now();
     if (!forceRefresh) {
@@ -461,7 +515,7 @@
     aiLoading = true;
     setAdviceSource('loading');
     const prompt = buildAiPrompt(settings, age);
-    callGeminiApi(settings.geminiApiKey, prompt).then(function (text) {
+    callGroqApi(settings.groqApiKey, prompt).then(function (text) {
       lastApiCallAt = Date.now();
       saveCachedAdvice(text);
       saveLastSuccessAdvice(text);
@@ -478,7 +532,7 @@
     els.aiSourceBadge.className = 'ai-source-badge';
     if (source === 'ai') {
       els.aiSourceBadge.classList.add('ai-source-ai');
-      els.aiSourceBadge.textContent = '🤖 Gemini AI';
+      els.aiSourceBadge.textContent = '🤖 Groq AI';
     } else if (source === 'loading') {
       els.aiSourceBadge.classList.add('ai-source-loading');
       els.aiSourceBadge.textContent = '⏳ AI güncelleniyor...';
@@ -857,6 +911,12 @@
   els.settingsBtn.addEventListener('click', () => {
     const settings = loadSettings();
     els.babyNameInput.value = settings.babyName || '';
+    if (els.groqApiTestInput) {
+      els.groqApiTestInput.value = settings.groqApiKey || '';
+    }
+    if (els.apiTestResult) {
+      els.apiTestResult.textContent = 'Test sonucu burada görünür...';
+    }
     els.settingsModal.hidden = false;
   });
 
@@ -874,6 +934,21 @@
     updateLocalAdvice();
     trySilentAiAdvice(true);
   });
+
+  if (els.apiTestBtn) {
+    els.apiTestBtn.addEventListener('click', async () => {
+      const key = els.groqApiTestInput ? els.groqApiTestInput.value.trim() : '';
+      els.apiTestResult.textContent = '⏳ Test ediliyor...';
+      els.apiTestBtn.disabled = true;
+      try {
+        els.apiTestResult.textContent = await testGroqApiDebug(key);
+      } catch (e) {
+        els.apiTestResult.textContent = '❌ ' + (e.message || e);
+      } finally {
+        els.apiTestBtn.disabled = false;
+      }
+    });
+  }
 
   els.closeReport.addEventListener('click', () => { els.reportModal.hidden = true; });
   els.reportModal.addEventListener('click', e => {

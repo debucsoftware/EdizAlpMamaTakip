@@ -150,7 +150,14 @@
       <div class="modal-body">
         <label class="field-label">Bebeğin Adı</label>
         <input type="text" id="babyNameInput" class="input" placeholder="Örn: Ediz" maxlength="30">
-        <p class="hint">Beslenme kayıtları telefonunuzda saklanır. Doğum tarihi ve AI ayarları sabittir.</p>
+        <p class="hint">Beslenme kayıtları telefonunuzda saklanır. Doğum tarihi sabittir.</p>
+
+        <div class="api-test-box">
+          <label class="field-label">🔧 Groq API Test (geçici)</label>
+          <input type="text" id="groqApiTestInput" class="input" placeholder="gsk_..." autocomplete="off">
+          <button type="button" class="btn-secondary btn-full" id="apiTestBtn">API Test Et</button>
+          <pre class="api-test-result" id="apiTestResult">Test sonucu burada görünür...</pre>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="btn-primary" id="saveSettings">Kaydet</button>
@@ -178,7 +185,7 @@
   <!-- Toast -->
   <div class="toast" id="toast" hidden></div>
 
-  <script src="js/seed-data.js?v=4"></script>
-  <script src="js/app.js?v=4"></script>
+  <script src="js/seed-data.js?v=7"></script>
+  <script src="js/app.js?v=7"></script>
 </body>
 </html>
