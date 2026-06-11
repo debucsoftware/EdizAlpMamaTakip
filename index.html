@@ -34,114 +34,142 @@
   </header>
 
   <main class="main">
-    <!-- Günlük Özet -->
-    <section class="stats-card card">
-      <h2 class="section-title">📊 Bugünün Özeti</h2>
-      <div class="stats-grid">
-        <div class="stat-item stat-milk">
-          <span class="stat-emoji">🍼</span>
-          <span class="stat-value" id="statSut">0</span>
-          <span class="stat-label">ml Süt</span>
-        </div>
-        <div class="stat-item stat-formula">
-          <span class="stat-emoji">🍶</span>
-          <span class="stat-value" id="statMama">0</span>
-          <span class="stat-label">ml Mama</span>
-        </div>
-        <div class="stat-item stat-total">
-          <span class="stat-emoji">💧</span>
-          <span class="stat-value" id="statTotal">0</span>
-          <span class="stat-label">ml Toplam</span>
-        </div>
-        <div class="stat-item stat-poop">
-          <span class="stat-emoji">💩</span>
-          <span class="stat-value" id="statKaka">0</span>
-          <span class="stat-label">Bez</span>
-        </div>
-      </div>
-      <p class="encouragement" id="encouragement"></p>
-    </section>
+    <div class="tab-panels">
+      <!-- Sekme: Özet -->
+      <div class="tab-panel active" id="tab-ozet" data-tab-panel="ozet">
+        <section class="stats-card card">
+          <h2 class="section-title">📊 Bugünün Özeti</h2>
+          <div class="stats-grid">
+            <div class="stat-item stat-milk">
+              <span class="stat-emoji">🍼</span>
+              <span class="stat-value" id="statSut">0</span>
+              <span class="stat-label">ml Süt</span>
+            </div>
+            <div class="stat-item stat-formula">
+              <span class="stat-emoji">🍶</span>
+              <span class="stat-value" id="statMama">0</span>
+              <span class="stat-label">ml Mama</span>
+            </div>
+            <div class="stat-item stat-total">
+              <span class="stat-emoji">💧</span>
+              <span class="stat-value" id="statTotal">0</span>
+              <span class="stat-label">ml Toplam</span>
+            </div>
+            <div class="stat-item stat-poop">
+              <span class="stat-emoji">💩</span>
+              <span class="stat-value" id="statKaka">0</span>
+              <span class="stat-label">Bez</span>
+            </div>
+          </div>
+          <p class="encouragement" id="encouragement"></p>
+        </section>
 
-    <!-- AI Tavsiye -->
-    <section class="ai-card card">
-      <div class="ai-header">
-        <div class="ai-title-wrap">
-          <h2 class="section-title">🌟 Günlük Tavsiye</h2>
-          <span class="ai-source-badge ai-source-local" id="aiSourceBadge">📱 Yerel tavsiye</span>
-        </div>
-        <span class="baby-age" id="babyAge"></span>
-      </div>
-      <p class="ai-placeholder" id="aiPlaceholder" hidden></p>
-      <div class="ai-content" id="aiContent" hidden></div>
-      <p class="ai-disclaimer">ℹ️ Bilgilendirme amaçlıdır, doktor tavsiyesi yerine geçmez.</p>
-    </section>
-
-    <!-- Hızlı Ekleme -->
-    <section class="quick-add card">
-      <h2 class="section-title">✨ Hızlı Ekle</h2>
-      <div class="type-tabs">
-        <button type="button" class="type-tab active" data-type="sut">🍼 Süt</button>
-        <button type="button" class="type-tab" data-type="mama">🍶 Mama</button>
-        <button type="button" class="type-tab" data-type="kaka">💩 Bez</button>
+        <section class="ai-card card">
+          <div class="ai-header">
+            <div class="ai-title-wrap">
+              <h2 class="section-title">🌟 Günlük Tavsiye</h2>
+              <span class="ai-source-badge ai-source-local" id="aiSourceBadge">📱 Yerel tavsiye</span>
+            </div>
+            <span class="baby-age" id="babyAge"></span>
+          </div>
+          <p class="ai-placeholder" id="aiPlaceholder" hidden></p>
+          <div class="ai-content" id="aiContent" hidden></div>
+          <p class="ai-disclaimer">ℹ️ Bilgilendirme amaçlıdır, doktor tavsiyesi yerine geçmez.</p>
+        </section>
       </div>
 
-      <div class="feed-panel" id="feedPanel">
-        <label class="field-label">Miktar (ml)</label>
-        <div class="amount-presets">
-          <button type="button" class="preset-btn" data-ml="30">30</button>
-          <button type="button" class="preset-btn" data-ml="60">60</button>
-          <button type="button" class="preset-btn" data-ml="90">90</button>
-          <button type="button" class="preset-btn" data-ml="120">120</button>
-          <button type="button" class="preset-btn" data-ml="150">150</button>
-          <button type="button" class="preset-btn" data-ml="180">180</button>
-        </div>
-        <input type="number" id="amountInput" class="input" placeholder="veya miktar gir..." min="1" max="500" inputmode="numeric">
+      <!-- Sekme: Ekle -->
+      <div class="tab-panel" id="tab-ekle" data-tab-panel="ekle" hidden>
+        <section class="quick-add card">
+          <h2 class="section-title">✨ Hızlı Ekle</h2>
+          <div class="type-tabs">
+            <button type="button" class="type-tab active" data-type="sut">🍼 Süt</button>
+            <button type="button" class="type-tab" data-type="mama">🍶 Mama</button>
+            <button type="button" class="type-tab" data-type="kaka">💩 Bez</button>
+          </div>
+
+          <div class="feed-panel" id="feedPanel">
+            <label class="field-label">Miktar (ml)</label>
+            <div class="amount-presets">
+              <button type="button" class="preset-btn" data-ml="30">30</button>
+              <button type="button" class="preset-btn" data-ml="60">60</button>
+              <button type="button" class="preset-btn" data-ml="90">90</button>
+              <button type="button" class="preset-btn" data-ml="120">120</button>
+              <button type="button" class="preset-btn" data-ml="150">150</button>
+              <button type="button" class="preset-btn" data-ml="180">180</button>
+            </div>
+            <input type="number" id="amountInput" class="input" placeholder="veya miktar gir..." min="1" max="500" inputmode="numeric">
+          </div>
+
+          <div class="bez-panel" id="bezPanel" hidden>
+            <label class="field-label" for="noteInput">Bez Açıklaması</label>
+            <div class="note-presets">
+              <button type="button" class="note-preset-btn" data-note="kaka+çiş">kaka+çiş</button>
+              <button type="button" class="note-preset-btn" data-note="çiş">çiş</button>
+              <button type="button" class="note-preset-btn" data-note="kaka">kaka</button>
+              <button type="button" class="note-preset-btn" data-note="az kaka">az kaka</button>
+              <button type="button" class="note-preset-btn" data-note="bol kaka">bol kaka</button>
+            </div>
+            <textarea id="noteInput" class="input textarea-input" rows="2" placeholder="örn: kaka+çiş, yeşil renk..." maxlength="120"></textarea>
+          </div>
+
+          <div class="time-section">
+            <label class="field-label">Saat</label>
+            <input type="time" id="timeInput" class="input">
+          </div>
+
+          <button type="button" class="btn-primary" id="addBtn">
+            <span class="btn-emoji">➕</span> Kaydet
+          </button>
+        </section>
       </div>
 
-      <div class="bez-panel" id="bezPanel" hidden>
-        <label class="field-label" for="noteInput">Bez Açıklaması</label>
-        <div class="note-presets">
-          <button type="button" class="note-preset-btn" data-note="kaka+çiş">kaka+çiş</button>
-          <button type="button" class="note-preset-btn" data-note="çiş">çiş</button>
-          <button type="button" class="note-preset-btn" data-note="kaka">kaka</button>
-          <button type="button" class="note-preset-btn" data-note="az kaka">az kaka</button>
-          <button type="button" class="note-preset-btn" data-note="bol kaka">bol kaka</button>
-        </div>
-        <textarea id="noteInput" class="input textarea-input" rows="2" placeholder="örn: kaka+çiş, yeşil renk..." maxlength="120"></textarea>
+      <!-- Sekme: Bugün -->
+      <div class="tab-panel" id="tab-bugun" data-tab-panel="bugun" hidden>
+        <section class="timeline card">
+          <div class="timeline-header">
+            <h2 class="section-title">📋 Bugünkü Kayıtlar</h2>
+            <div class="timeline-actions">
+              <button type="button" class="btn-text" id="reportBtn">📄 Rapor Al</button>
+              <button type="button" class="btn-text" id="weeklyReportBtn">📊 Haftalık Rapor</button>
+            </div>
+          </div>
+          <ul class="timeline-list" id="timelineList">
+            <li class="empty-state">Henüz kayıt yok. İlk kaydı ekleyin! 🌟</li>
+          </ul>
+        </section>
       </div>
 
-      <div class="time-section">
-        <label class="field-label">Saat</label>
-        <input type="time" id="timeInput" class="input">
+      <!-- Sekme: Geçmiş -->
+      <div class="tab-panel" id="tab-gecmis" data-tab-panel="gecmis" hidden>
+        <section class="history card">
+          <h2 class="section-title">📅 Geçmiş Günler</h2>
+          <div class="history-list" id="historyList">
+            <p class="empty-state">Henüz geçmiş kayıt yok.</p>
+          </div>
+        </section>
       </div>
-
-      <button type="button" class="btn-primary" id="addBtn">
-        <span class="btn-emoji">➕</span> Kaydet
-      </button>
-    </section>
-
-    <!-- Bugünkü Kayıtlar -->
-    <section class="timeline card">
-      <div class="timeline-header">
-        <h2 class="section-title">📋 Bugünkü Kayıtlar</h2>
-        <div class="timeline-actions">
-          <button type="button" class="btn-text" id="reportBtn">📄 Rapor Al</button>
-          <button type="button" class="btn-text" id="weeklyReportBtn">📊 Haftalık Rapor</button>
-        </div>
-      </div>
-      <ul class="timeline-list" id="timelineList">
-        <li class="empty-state">Henüz kayıt yok. İlk kaydı ekleyin! 🌟</li>
-      </ul>
-    </section>
-
-    <!-- Geçmiş Günler -->
-    <section class="history card">
-      <h2 class="section-title">📅 Geçmiş Günler</h2>
-      <div class="history-list" id="historyList">
-        <p class="empty-state">Henüz geçmiş kayıt yok.</p>
-      </div>
-    </section>
+    </div>
   </main>
+
+  <nav class="main-tabs" aria-label="Ana menü">
+    <button type="button" class="main-tab active" data-tab="ozet">
+      <span class="main-tab-icon">📊</span>
+      <span class="main-tab-label">Özet</span>
+    </button>
+    <button type="button" class="main-tab" data-tab="ekle">
+      <span class="main-tab-icon">➕</span>
+      <span class="main-tab-label">Ekle</span>
+    </button>
+    <button type="button" class="main-tab" data-tab="bugun">
+      <span class="main-tab-icon">📋</span>
+      <span class="main-tab-label">Bugün</span>
+    </button>
+    <button type="button" class="main-tab" data-tab="gecmis">
+      <span class="main-tab-icon">📅</span>
+      <span class="main-tab-label">Geçmiş</span>
+    </button>
+  </nav>
 
   <!-- Ayarlar Modal -->
   <div class="modal-overlay" id="settingsModal" hidden>
@@ -201,7 +229,10 @@
   <!-- Toast -->
   <div class="toast" id="toast" hidden></div>
 
-  <script src="js/seed-data.js?v=9"></script>
-  <script src="js/app.js?v=9"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="js/firebase-sync.js?v=12"></script>
+  <script src="js/seed-data.js?v=12"></script>
+  <script src="js/app.js?v=12"></script>
 </body>
 </html>

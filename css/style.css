@@ -31,7 +31,7 @@ body {
   background: linear-gradient(160deg, #ffeef2 0%, #e8f4fd 40%, #fff9e6 100%);
   min-height: 100dvh;
   color: var(--text);
-  padding-bottom: 2rem;
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
   overflow-x: hidden;
 }
 
@@ -134,9 +134,74 @@ body {
   padding: 1rem;
   position: relative;
   z-index: 1;
+}
+
+.tab-panels {
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-panel {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  animation: tabFadeIn 0.2s ease;
+}
+
+.tab-panel[hidden] {
+  display: none !important;
+}
+
+@keyframes tabFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.main-tabs {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  max-width: 480px;
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  border-top: 2px solid var(--pink);
+  padding: 0.35rem 0.25rem calc(0.35rem + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -4px 20px rgba(255, 105, 135, 0.12);
+}
+
+.main-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.4rem 0.2rem;
+  border: none;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  color: var(--text-light);
+  transition: background 0.15s, color 0.15s;
+}
+
+.main-tab.active {
+  background: linear-gradient(135deg, #ffeef2, #fce7f3);
+  color: var(--pink-dark);
+}
+
+.main-tab-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.main-tab-label {
+  font-size: 0.65rem;
+  font-weight: 800;
 }
 
 .card {

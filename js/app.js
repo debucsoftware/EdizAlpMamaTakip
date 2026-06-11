@@ -101,6 +101,9 @@
 
   function saveData(data) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    if (window.FirestoreSync && window.FirestoreSync.isReady()) {
+      window.FirestoreSync.push(data, loadSettings());
+    }
   }
 
   function loadSettings() {
@@ -121,6 +124,9 @@
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
       babyName: settings.babyName || DEFAULT_SETTINGS.babyName
     }));
+    if (window.FirestoreSync && window.FirestoreSync.isReady()) {
+      window.FirestoreSync.push(loadData(), loadSettings());
+    }
   }
 
   function importSeedIfNeeded() {
@@ -718,6 +724,7 @@
     renderHistory();
     updateLocalAdvice();
     scheduleAiRefresh();
+    switchMainTab('bugun');
   }
 
   function deleteEntry(id) {
@@ -980,7 +987,24 @@
     }
   }
 
+  // --- Main Tabs ---
+
+  function switchMainTab(tabId) {
+    document.querySelectorAll('.main-tab').forEach(function (tab) {
+      tab.classList.toggle('active', tab.dataset.tab === tabId);
+    });
+    document.querySelectorAll('.tab-panel').forEach(function (panel) {
+      panel.hidden = panel.dataset.tabPanel !== tabId;
+    });
+  }
+
   // --- Event Listeners ---
+
+  document.querySelectorAll('.main-tab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      switchMainTab(tab.dataset.tab);
+    });
+  });
 
   document.querySelectorAll('.type-tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -1066,9 +1090,31 @@
 
   // --- Init ---
 
-  importSeedIfNeeded();
-  setCurrentTime();
-  updateAmountVisibility();
-  renderAll();
-  startHourlyAdviceRefresh();
+  function onRemoteSyncUpdate() {
+    renderHeader();
+    renderStats();
+    renderTimeline();
+    renderHistory();
+    renderBabyAge();
+    updateLocalAdvice();
+    showToast('Veriler güncellendi ☁️');
+  }
+
+  async function initApp() {
+    importSeedIfNeeded();
+
+    if (window.FirestoreSync) {
+      const syncResult = await window.FirestoreSync.init(onRemoteSyncUpdate);
+      if (syncResult && syncResult.uploaded && syncResult.entryCount > 0) {
+        showToast(syncResult.entryCount + ' kayıt Firestore\'a yüklendi ☁️');
+      }
+    }
+
+    setCurrentTime();
+    updateAmountVisibility();
+    renderAll();
+    startHourlyAdviceRefresh();
+  }
+
+  initApp();
 })();

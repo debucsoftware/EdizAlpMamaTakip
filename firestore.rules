@@ -1,0 +1,9 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /app/{docId} {
+      // Kişisel aile uygulaması — Firebase Console'dan sıkılaştırın
+      allow read, write: if true;
+    }
+  }
+}
