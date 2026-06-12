@@ -2,6 +2,8 @@
 
 Bebeğin süt/mama beslenmesini ve kaka takibini kolayca yapmanızı sağlayan mobil uyumlu web uygulaması.
 
+🌐 **Canlı uygulama:** [https://debucsoftware.github.io/EdizAlpMamaTakip/](https://debucsoftware.github.io/EdizAlpMamaTakip/)
+
 ## Özellikler
 
 - 🍼 **Süt** ve 🍶 **Mama** kaydı (ml cinsinden)
