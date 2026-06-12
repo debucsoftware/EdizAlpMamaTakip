@@ -509,6 +509,16 @@ body {
   margin-bottom: 0.5rem;
 }
 
+.datetime-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.datetime-row .input {
+  flex: 1;
+  min-width: 0;
+}
+
 .btn-primary {
   width: 100%;
   padding: 1rem;

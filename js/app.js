@@ -57,6 +57,7 @@
     bezPanel: document.getElementById('bezPanel'),
     noteInput: document.getElementById('noteInput'),
     amountInput: document.getElementById('amountInput'),
+    dateInput: document.getElementById('dateInput'),
     timeInput: document.getElementById('timeInput'),
     addBtn: document.getElementById('addBtn'),
     timelineList: document.getElementById('timelineList'),
@@ -639,6 +640,10 @@
 
   function setCurrentTime() {
     const now = new Date();
+    const y = now.getFullYear();
+    const mo = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    els.dateInput.value = `${y}-${mo}-${d}`;
     const h = String(now.getHours()).padStart(2, '0');
     const m = String(now.getMinutes()).padStart(2, '0');
     els.timeInput.value = `${h}:${m}`;
@@ -671,6 +676,12 @@
       return;
     }
 
+    const dateVal = els.dateInput.value;
+    if (!dateVal) {
+      showToast('Lütfen tarih seçin 📅');
+      return;
+    }
+
     const timeVal = els.timeInput.value;
     if (!timeVal) {
       showToast('Lütfen saat girin ⏰');
@@ -686,9 +697,9 @@
       }
     }
 
+    const [year, month, day] = dateVal.split('-').map(function (v) { return parseInt(v, 10); });
     const [h, m] = timeVal.split(':');
-    const now = new Date();
-    const timestamp = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(h, 10), parseInt(m, 10)).toISOString();
+    const timestamp = new Date(year, month - 1, day, parseInt(h, 10), parseInt(m, 10)).toISOString();
 
     const entry = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
