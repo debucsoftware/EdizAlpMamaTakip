@@ -38,6 +38,7 @@
 
   let selectedType = 'sut';
   let selectedPreset = null;
+  let selectedEmdiPreset = null;
   let aiLoading = false;
   let lastAdviceHour = new Date().getHours();
   let lastApiCallAt = 0;
@@ -54,6 +55,8 @@
     statKaka: document.getElementById('statKaka'),
     encouragement: document.getElementById('encouragement'),
     feedPanel: document.getElementById('feedPanel'),
+    emdiPanel: document.getElementById('emdiPanel'),
+    emdiInput: document.getElementById('emdiInput'),
     bezPanel: document.getElementById('bezPanel'),
     noteInput: document.getElementById('noteInput'),
     amountInput: document.getElementById('amountInput'),
@@ -127,6 +130,9 @@
       return entry.note ? time : `${time} · bez değişimi`;
     }
     if (entry.type === 'emdi') {
+      const dur = entry.amount ? `${entry.amount} dk` : '';
+      if (dur && entry.note) return `${dur} · ${time} · ${entry.note}`;
+      if (dur) return `${dur} · ${time}`;
       return entry.note ? `${time} · ${entry.note}` : time;
     }
     const ml = `${entry.amount || '?'} ml · ${time}`;
@@ -271,7 +277,7 @@
     return entries.map(e => {
       const time = formatTime(e.timestamp);
       if (e.type === 'kaka') return `${time} bez${e.note ? ' (' + e.note + ')' : ''}`;
-      if (e.type === 'emdi') return `${time} emzirme${e.note ? ' (' + e.note + ')' : ''}`;
+      if (e.type === 'emdi') return `${time} ${e.amount || '?'}dk emzirme${e.note ? ' (' + e.note + ')' : ''}`;
       if (e.type === 'sut') return `${time} ${e.amount}ml süt${e.note ? ' (' + e.note + ')' : ''}`;
       if (e.type === 'mama') return `${time} ${e.amount}ml mama${e.note ? ' (' + e.note + ')' : ''}`;
       return time;
@@ -567,9 +573,9 @@
     els.timelineList.innerHTML = todayEntries.map(entry => {
       const cfg = TYPE_CONFIG[entry.type];
       const detail = formatEntryDetail(entry);
-      const typeLabel = entry.type === 'kaka' && entry.note
-        ? `${cfg.label} · ${entry.note}`
-        : cfg.label;
+      let typeLabel = cfg.label;
+      if (entry.type === 'kaka' && entry.note) typeLabel = `${cfg.label} · ${entry.note}`;
+      else if (entry.type === 'emdi' && entry.amount) typeLabel = `${cfg.label} · ${entry.amount} dk`;
 
       return `
         <li class="timeline-item ${cfg.color}">
@@ -651,18 +657,36 @@
 
   function updateAmountVisibility() {
     const isKaka = selectedType === 'kaka';
-    if (els.feedPanel) els.feedPanel.hidden = isKaka;
+    const isEmdi = selectedType === 'emdi';
+    const isFeed = selectedType === 'sut' || selectedType === 'mama';
+    if (els.feedPanel) els.feedPanel.hidden = !isFeed;
+    if (els.emdiPanel) els.emdiPanel.hidden = !isEmdi;
     if (els.bezPanel) els.bezPanel.hidden = !isKaka;
     if (isKaka) {
       els.amountInput.value = '';
       selectedPreset = null;
       document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
+      if (els.emdiInput) els.emdiInput.value = '';
+      selectedEmdiPreset = null;
+      document.querySelectorAll('.emdi-preset-btn').forEach(b => b.classList.remove('selected'));
       setTimeout(function () {
         if (els.noteInput) els.noteInput.focus();
+      }, 50);
+    } else if (isEmdi) {
+      els.amountInput.value = '';
+      selectedPreset = null;
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
+      if (els.noteInput) els.noteInput.value = '';
+      document.querySelectorAll('.note-preset-btn').forEach(b => b.classList.remove('selected'));
+      setTimeout(function () {
+        if (els.emdiInput) els.emdiInput.focus();
       }, 50);
     } else {
       if (els.noteInput) els.noteInput.value = '';
       document.querySelectorAll('.note-preset-btn').forEach(b => b.classList.remove('selected'));
+      if (els.emdiInput) els.emdiInput.value = '';
+      selectedEmdiPreset = null;
+      document.querySelectorAll('.emdi-preset-btn').forEach(b => b.classList.remove('selected'));
     }
   }
 
@@ -689,7 +713,13 @@
     }
 
     let amount = null;
-    if (selectedType !== 'kaka') {
+    if (selectedType === 'emdi') {
+      amount = parseInt(els.emdiInput.value, 10);
+      if (!amount || amount <= 0) {
+        showToast('Lütfen süre girin (dk) 🤱');
+        return;
+      }
+    } else if (selectedType !== 'kaka') {
       amount = parseInt(els.amountInput.value, 10);
       if (!amount || amount <= 0) {
         showToast('Lütfen miktar girin (ml) 🍼');
@@ -704,13 +734,14 @@
     const entry = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       type: selectedType,
-      amount,
       timestamp
     };
 
     if (selectedType === 'kaka') {
       const note = getNoteValue();
       if (note) entry.note = note;
+    } else if (amount !== null) {
+      entry.amount = amount;
     }
 
     const data = loadData();
@@ -718,15 +749,20 @@
     saveData(data);
 
     els.amountInput.value = '';
+    if (els.emdiInput) els.emdiInput.value = '';
     if (els.noteInput) els.noteInput.value = '';
     selectedPreset = null;
+    selectedEmdiPreset = null;
     document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
+    document.querySelectorAll('.emdi-preset-btn').forEach(b => b.classList.remove('selected'));
     document.querySelectorAll('.note-preset-btn').forEach(b => b.classList.remove('selected'));
     setCurrentTime();
 
     spawnConfetti();
     const cfg = TYPE_CONFIG[selectedType];
-    const noteMsg = selectedType === 'kaka' && entry.note ? ' · ' + entry.note : '';
+    let noteMsg = '';
+    if (selectedType === 'kaka' && entry.note) noteMsg = ' · ' + entry.note;
+    else if (selectedType === 'emdi') noteMsg = ' · ' + amount + ' dk';
     showToast(`${cfg.emoji} ${cfg.label} kaydedildi${noteMsg}!`);
     renderHeader();
     renderStats();
@@ -786,7 +822,9 @@
         if (e.type === 'kaka') {
           report += `  ${time}  ${cfg.emoji} ${e.note || 'Bez'}\n`;
         } else if (e.type === 'emdi') {
-          report += `  ${time}  ${cfg.emoji} ${e.note || 'Emzirme'}\n`;
+          const dur = e.amount ? `${e.amount} dk` : '';
+          const note = e.note ? ` (${e.note})` : '';
+          report += `  ${time}  ${cfg.emoji} Emzirme${dur ? ' - ' + dur : ''}${note}\n`;
         } else {
           const note = e.note ? ` (${e.note})` : '';
           report += `  ${time}  ${cfg.emoji} ${cfg.label} - ${e.amount} ml${note}\n`;
@@ -1045,6 +1083,23 @@
     selectedPreset = null;
     document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
   });
+
+  document.querySelectorAll('.emdi-preset-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.querySelectorAll('.emdi-preset-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedEmdiPreset = parseInt(btn.dataset.dk, 10);
+      if (els.emdiInput) els.emdiInput.value = selectedEmdiPreset;
+    });
+  });
+
+  if (els.emdiInput) {
+    els.emdiInput.addEventListener('input', () => {
+      selectedEmdiPreset = null;
+      document.querySelectorAll('.emdi-preset-btn').forEach(b => b.classList.remove('selected'));
+    });
+  }
 
   document.querySelectorAll('.note-preset-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {

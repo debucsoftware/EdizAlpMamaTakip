@@ -85,6 +85,7 @@
           <div class="type-tabs">
             <button type="button" class="type-tab active" data-type="sut">🍼 Süt</button>
             <button type="button" class="type-tab" data-type="mama">🍶 Mama</button>
+            <button type="button" class="type-tab" data-type="emdi">🤱 Emzirme</button>
             <button type="button" class="type-tab" data-type="kaka">💩 Bez</button>
           </div>
 
@@ -99,6 +100,19 @@
               <button type="button" class="preset-btn" data-ml="180">180</button>
             </div>
             <input type="number" id="amountInput" class="input" placeholder="veya miktar gir..." min="1" max="500" inputmode="numeric">
+          </div>
+
+          <div class="emdi-panel" id="emdiPanel" hidden>
+            <label class="field-label">Süre (dk)</label>
+            <div class="amount-presets">
+              <button type="button" class="emdi-preset-btn" data-dk="5">5</button>
+              <button type="button" class="emdi-preset-btn" data-dk="10">10</button>
+              <button type="button" class="emdi-preset-btn" data-dk="15">15</button>
+              <button type="button" class="emdi-preset-btn" data-dk="20">20</button>
+              <button type="button" class="emdi-preset-btn" data-dk="25">25</button>
+              <button type="button" class="emdi-preset-btn" data-dk="30">30</button>
+            </div>
+            <input type="number" id="emdiInput" class="input" placeholder="veya süre gir..." min="1" max="180" inputmode="numeric">
           </div>
 
           <div class="bez-panel" id="bezPanel" hidden>
@@ -236,6 +250,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script src="js/firebase-sync.js?v=15"></script>
   <script src="js/seed-data.js?v=15"></script>
-  <script src="js/app.js?v=15"></script>
+  <script src="js/app.js?v=16"></script>
 </body>
 </html>
