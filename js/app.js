@@ -39,6 +39,8 @@
   let selectedType = 'sut';
   let selectedPreset = null;
   let selectedEmdiPreset = null;
+  let editingEntryId = null;
+  let editSelectedType = 'sut';
   let aiLoading = false;
   let lastAdviceHour = new Date().getHours();
   let lastApiCallAt = 0;
@@ -81,6 +83,19 @@
     reportModal: document.getElementById('reportModal'),
     closeReport: document.getElementById('closeReport'),
     reportContent: document.getElementById('reportContent'),
+    reportEntryList: document.getElementById('reportEntryList'),
+    editModal: document.getElementById('editModal'),
+    closeEdit: document.getElementById('closeEdit'),
+    cancelEdit: document.getElementById('cancelEdit'),
+    saveEdit: document.getElementById('saveEdit'),
+    editFeedPanel: document.getElementById('editFeedPanel'),
+    editEmdiPanel: document.getElementById('editEmdiPanel'),
+    editBezPanel: document.getElementById('editBezPanel'),
+    editAmountInput: document.getElementById('editAmountInput'),
+    editEmdiInput: document.getElementById('editEmdiInput'),
+    editNoteInput: document.getElementById('editNoteInput'),
+    editDateInput: document.getElementById('editDateInput'),
+    editTimeInput: document.getElementById('editTimeInput'),
     copyReport: document.getElementById('copyReport'),
     shareReport: document.getElementById('shareReport'),
     toast: document.getElementById('toast'),
@@ -560,38 +575,79 @@
     els.statKaka.textContent = stats.kaka;
   }
 
+  let activeReportDateKey = null;
+
+  function refreshEntryViews() {
+    renderHeader();
+    renderStats();
+    renderTimeline();
+    renderHistory();
+    if (activeReportDateKey && !els.reportModal.hidden) {
+      els.reportContent.textContent = generateReport(activeReportDateKey);
+      renderReportEntries(activeReportDateKey);
+    }
+    updateLocalAdvice();
+    scheduleAiRefresh();
+  }
+
+  function findEntryById(id) {
+    return loadData().entries.find(function (e) { return e.id === id; });
+  }
+
+  function buildEntryItemHTML(entry) {
+    const cfg = TYPE_CONFIG[entry.type];
+    const detail = formatEntryDetail(entry);
+    let typeLabel = cfg.label;
+    if (entry.type === 'kaka' && entry.note) typeLabel = `${cfg.label} · ${entry.note}`;
+    else if (entry.type === 'emdi' && entry.amount) typeLabel = `${cfg.label} · ${entry.amount} dk`;
+
+    return `
+      <li class="timeline-item ${cfg.color}">
+        <span class="timeline-emoji">${cfg.emoji}</span>
+        <div class="timeline-info">
+          <div class="timeline-type">${typeLabel}</div>
+          <div class="timeline-detail">${detail}</div>
+        </div>
+        <div class="timeline-actions">
+          <button class="btn-edit" data-id="${entry.id}" aria-label="Düzenle">✏️</button>
+          <button class="btn-delete" data-id="${entry.id}" aria-label="Sil">🗑️</button>
+        </div>
+      </li>
+    `;
+  }
+
+  function bindEntryActionButtons(container) {
+    if (!container) return;
+    container.querySelectorAll('.btn-edit').forEach(btn => {
+      btn.addEventListener('click', () => openEditEntry(btn.dataset.id));
+    });
+    container.querySelectorAll('.btn-delete').forEach(btn => {
+      btn.addEventListener('click', () => deleteEntry(btn.dataset.id));
+    });
+  }
+
+  function renderEntryList(container, entries, emptyMessage) {
+    if (!container) return;
+    if (entries.length === 0) {
+      container.innerHTML = `<li class="empty-state">${emptyMessage}</li>`;
+      return;
+    }
+    container.innerHTML = entries.map(buildEntryItemHTML).join('');
+    bindEntryActionButtons(container);
+  }
+
   function renderTimeline() {
     const data = loadData();
     const todayEntries = getEntriesForDate(data.entries, todayKey())
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    renderEntryList(els.timelineList, todayEntries, 'Henüz kayıt yok. İlk kaydı ekleyin! 🌟');
+  }
 
-    if (todayEntries.length === 0) {
-      els.timelineList.innerHTML = '<li class="empty-state">Henüz kayıt yok. İlk kaydı ekleyin! 🌟</li>';
-      return;
-    }
-
-    els.timelineList.innerHTML = todayEntries.map(entry => {
-      const cfg = TYPE_CONFIG[entry.type];
-      const detail = formatEntryDetail(entry);
-      let typeLabel = cfg.label;
-      if (entry.type === 'kaka' && entry.note) typeLabel = `${cfg.label} · ${entry.note}`;
-      else if (entry.type === 'emdi' && entry.amount) typeLabel = `${cfg.label} · ${entry.amount} dk`;
-
-      return `
-        <li class="timeline-item ${cfg.color}">
-          <span class="timeline-emoji">${cfg.emoji}</span>
-          <div class="timeline-info">
-            <div class="timeline-type">${typeLabel}</div>
-            <div class="timeline-detail">${detail}</div>
-          </div>
-          <button class="btn-delete" data-id="${entry.id}" aria-label="Sil">🗑️</button>
-        </li>
-      `;
-    }).join('');
-
-    els.timelineList.querySelectorAll('.btn-delete').forEach(btn => {
-      btn.addEventListener('click', () => deleteEntry(btn.dataset.id));
-    });
+  function renderReportEntries(dateKey) {
+    const data = loadData();
+    const entries = getEntriesForDate(data.entries, dateKey)
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    renderEntryList(els.reportEntryList, entries, 'Bu gün için kayıt yok.');
   }
 
   function renderHistory() {
@@ -781,18 +837,126 @@
     }
     window.FirestoreSync.deleteEntry(id).catch(function () {
       showToast('Kayıt silinemedi ☁️');
-      renderHeader();
-      renderStats();
-      renderTimeline();
-      renderHistory();
+      refreshEntryViews();
     });
     showToast('Kayıt silindi');
-    renderHeader();
-    renderStats();
-    renderTimeline();
-    renderHistory();
-    updateLocalAdvice();
-    scheduleAiRefresh();
+    refreshEntryViews();
+  }
+
+  function updateEditPanelsVisibility() {
+    const isKaka = editSelectedType === 'kaka';
+    const isEmdi = editSelectedType === 'emdi';
+    const isFeed = editSelectedType === 'sut' || editSelectedType === 'mama';
+    if (els.editFeedPanel) els.editFeedPanel.hidden = !isFeed;
+    if (els.editEmdiPanel) els.editEmdiPanel.hidden = !isEmdi;
+    if (els.editBezPanel) els.editBezPanel.hidden = !isKaka;
+  }
+
+  function openEditEntry(id) {
+    const entry = findEntryById(id);
+    if (!entry) return;
+
+    editingEntryId = id;
+    editSelectedType = entry.type;
+
+    document.querySelectorAll('.edit-type-tab').forEach(function (tab) {
+      tab.classList.toggle('active', tab.dataset.type === entry.type);
+    });
+    updateEditPanelsVisibility();
+
+    const d = new Date(entry.timestamp);
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    els.editDateInput.value = `${y}-${mo}-${day}`;
+    els.editTimeInput.value = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+    if (els.editAmountInput) els.editAmountInput.value = '';
+    if (els.editEmdiInput) els.editEmdiInput.value = '';
+    if (els.editNoteInput) els.editNoteInput.value = '';
+
+    if (entry.type === 'kaka') {
+      if (els.editNoteInput) els.editNoteInput.value = entry.note || '';
+    } else if (entry.type === 'emdi') {
+      if (els.editEmdiInput) els.editEmdiInput.value = entry.amount || '';
+    } else if (els.editAmountInput) {
+      els.editAmountInput.value = entry.amount || '';
+    }
+
+    els.editModal.hidden = false;
+  }
+
+  function closeEditModal() {
+    els.editModal.hidden = true;
+    editingEntryId = null;
+  }
+
+  function saveEditEntry() {
+    if (!editingEntryId) return;
+    if (!firestoreReady) {
+      showToast('Veriler yükleniyor, bekleyin ☁️');
+      return;
+    }
+
+    const dateVal = els.editDateInput.value;
+    if (!dateVal) {
+      showToast('Lütfen tarih seçin 📅');
+      return;
+    }
+
+    const timeVal = els.editTimeInput.value;
+    if (!timeVal) {
+      showToast('Lütfen saat girin ⏰');
+      return;
+    }
+
+    let amount = null;
+    if (editSelectedType === 'emdi') {
+      amount = parseInt(els.editEmdiInput.value, 10);
+      if (!amount || amount <= 0) {
+        showToast('Lütfen süre girin (dk) 🤱');
+        return;
+      }
+    } else if (editSelectedType !== 'kaka') {
+      amount = parseInt(els.editAmountInput.value, 10);
+      if (!amount || amount <= 0) {
+        showToast('Lütfen miktar girin (ml) 🍼');
+        return;
+      }
+    }
+
+    const [year, month, day] = dateVal.split('-').map(function (v) { return parseInt(v, 10); });
+    const [h, m] = timeVal.split(':');
+    const timestamp = new Date(year, month - 1, day, parseInt(h, 10), parseInt(m, 10)).toISOString();
+
+    const entry = {
+      id: editingEntryId,
+      type: editSelectedType,
+      timestamp
+    };
+
+    if (editSelectedType === 'kaka') {
+      const note = els.editNoteInput ? els.editNoteInput.value.trim() : '';
+      if (note) entry.note = note;
+    } else if (amount !== null) {
+      entry.amount = amount;
+    }
+
+    const data = loadData();
+    const idx = data.entries.findIndex(function (e) { return e.id === editingEntryId; });
+    if (idx === -1) {
+      showToast('Kayıt bulunamadı');
+      closeEditModal();
+      return;
+    }
+
+    data.entries[idx] = entry;
+    saveData(data);
+
+    const cfg = TYPE_CONFIG[editSelectedType];
+    showToast(`${cfg.emoji} Kayıt güncellendi!`);
+    closeEditModal();
+    refreshEntryViews();
   }
 
   function generateReport(dateKey) {
@@ -989,7 +1153,9 @@
   }
 
   function showReportForDate(dateKey) {
+    activeReportDateKey = dateKey;
     els.reportContent.textContent = generateReport(dateKey);
+    renderReportEntries(dateKey);
     els.reportModal.hidden = false;
   }
 
@@ -1123,6 +1289,22 @@
   els.reportBtn.addEventListener('click', showTodayReport);
   els.weeklyReportBtn.addEventListener('click', showWeeklyReport);
 
+  document.querySelectorAll('.edit-type-tab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      document.querySelectorAll('.edit-type-tab').forEach(function (t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      editSelectedType = tab.dataset.type;
+      updateEditPanelsVisibility();
+    });
+  });
+
+  els.saveEdit.addEventListener('click', saveEditEntry);
+  els.cancelEdit.addEventListener('click', closeEditModal);
+  els.closeEdit.addEventListener('click', closeEditModal);
+  els.editModal.addEventListener('click', function (e) {
+    if (e.target === els.editModal) closeEditModal();
+  });
+
   els.closeWeeklyReport.addEventListener('click', () => { els.weeklyReportModal.hidden = true; });
   els.weeklyReportModal.addEventListener('click', e => {
     if (e.target === els.weeklyReportModal) els.weeklyReportModal.hidden = true;
@@ -1151,9 +1333,15 @@
     trySilentAiAdvice(true);
   });
 
-  els.closeReport.addEventListener('click', () => { els.reportModal.hidden = true; });
+  els.closeReport.addEventListener('click', () => {
+    els.reportModal.hidden = true;
+    activeReportDateKey = null;
+  });
   els.reportModal.addEventListener('click', e => {
-    if (e.target === els.reportModal) els.reportModal.hidden = true;
+    if (e.target === els.reportModal) {
+      els.reportModal.hidden = true;
+      activeReportDateKey = null;
+    }
   });
 
   els.copyReport.addEventListener('click', copyReport);

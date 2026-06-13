@@ -651,6 +651,13 @@ body {
   font-weight: 600;
 }
 
+.timeline-actions {
+  display: flex;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+
+.btn-edit,
 .btn-delete {
   background: none;
   border: none;
@@ -661,6 +668,7 @@ body {
   transition: opacity 0.2s;
 }
 
+.btn-edit:active,
 .btn-delete:active {
   opacity: 1;
 }
@@ -799,6 +807,12 @@ body {
   color: var(--text-light);
   margin-top: 0.75rem;
   font-weight: 600;
+}
+
+.report-entry-list {
+  margin-bottom: 1rem;
+  max-height: 35dvh;
+  overflow-y: auto;
 }
 
 .report-content {

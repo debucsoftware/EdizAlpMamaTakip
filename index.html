@@ -206,6 +206,51 @@
     </div>
   </div>
 
+  <!-- Düzenle Modal -->
+  <div class="modal-overlay" id="editModal" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h3>✏️ Kaydı Düzenle</h3>
+        <button class="btn-close" id="closeEdit">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="type-tabs">
+          <button type="button" class="edit-type-tab active" data-type="sut">🍼 Süt</button>
+          <button type="button" class="edit-type-tab" data-type="mama">🍶 Mama</button>
+          <button type="button" class="edit-type-tab" data-type="emdi">🤱 Emzirme</button>
+          <button type="button" class="edit-type-tab" data-type="kaka">💩 Bez</button>
+        </div>
+
+        <div class="feed-panel" id="editFeedPanel">
+          <label class="field-label">Miktar (ml)</label>
+          <input type="number" id="editAmountInput" class="input" placeholder="miktar gir..." min="1" max="500" inputmode="numeric">
+        </div>
+
+        <div class="emdi-panel" id="editEmdiPanel" hidden>
+          <label class="field-label">Süre (dk)</label>
+          <input type="number" id="editEmdiInput" class="input" placeholder="süre gir..." min="1" max="180" inputmode="numeric">
+        </div>
+
+        <div class="bez-panel" id="editBezPanel" hidden>
+          <label class="field-label" for="editNoteInput">Bez Açıklaması</label>
+          <textarea id="editNoteInput" class="input textarea-input" rows="2" placeholder="örn: kaka+çiş..." maxlength="120"></textarea>
+        </div>
+
+        <div class="time-section">
+          <label class="field-label">Tarih ve Saat</label>
+          <div class="datetime-row">
+            <input type="date" id="editDateInput" class="input">
+            <input type="time" id="editTimeInput" class="input">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer modal-footer-split">
+        <button class="btn-secondary" id="cancelEdit">İptal</button>
+        <button class="btn-primary" id="saveEdit">Kaydet</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Rapor Modal -->
   <div class="modal-overlay" id="reportModal" hidden>
     <div class="modal modal-report">
@@ -214,6 +259,7 @@
         <button class="btn-close" id="closeReport">&times;</button>
       </div>
       <div class="modal-body">
+        <ul class="timeline-list report-entry-list" id="reportEntryList"></ul>
         <pre class="report-content" id="reportContent"></pre>
       </div>
       <div class="modal-footer modal-footer-split">
@@ -250,6 +296,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script src="js/firebase-sync.js?v=15"></script>
   <script src="js/seed-data.js?v=15"></script>
-  <script src="js/app.js?v=16"></script>
+  <script src="js/app.js?v=18"></script>
 </body>
 </html>
