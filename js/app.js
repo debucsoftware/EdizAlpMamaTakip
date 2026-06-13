@@ -608,7 +608,7 @@
           <div class="timeline-type">${typeLabel}</div>
           <div class="timeline-detail">${detail}</div>
         </div>
-        <div class="timeline-actions">
+        <div class="entry-actions">
           <button class="btn-edit" data-id="${entry.id}" aria-label="Düzenle">✏️</button>
           <button class="btn-delete" data-id="${entry.id}" aria-label="Sil">🗑️</button>
         </div>

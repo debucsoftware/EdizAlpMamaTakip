@@ -579,7 +579,7 @@ body {
   margin-bottom: 0.5rem;
 }
 
-.timeline-actions {
+.timeline-header-actions {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -651,21 +651,26 @@ body {
   font-weight: 600;
 }
 
-.timeline-item .timeline-actions {
-  display: flex;
+.entry-actions {
+  display: inline-flex;
   flex-direction: row;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 0.15rem;
+  gap: 0.1rem;
   flex-shrink: 0;
 }
 
 .btn-edit,
 .btn-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
-  font-size: 1.1rem;
+  font-size: 1rem;
+  line-height: 1;
   cursor: pointer;
-  padding: 0.25rem;
+  padding: 0.2rem;
   opacity: 0.5;
   transition: opacity 0.2s;
 }
