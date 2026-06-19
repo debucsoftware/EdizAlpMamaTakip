@@ -51,16 +51,18 @@
     return (entries || []).filter(function (e) { return e && e.id && !deleted.has(e.id); });
   }
 
-  function mergeRemoteIntoState(remoteEntries, remoteDeletedIds) {
+  function mergeRemoteIntoState(remoteEntries, remoteDeletedIds, localWins) {
     state.deletedIds = uniqueIds(state.deletedIds.concat(remoteDeletedIds || []));
-    state.entries = filterDeleted(
-      mergeEntries(state.entries, remoteEntries || []),
-      state.deletedIds
-    );
+    const merged = localWins
+      ? mergeEntries(remoteEntries || [], state.entries)
+      : mergeEntries(state.entries, remoteEntries || []);
+    state.entries = filterDeleted(merged, state.deletedIds);
   }
 
   function entriesSignature(entries) {
-    return (entries || []).map(function (e) { return e.id; }).join(',');
+    return (entries || []).map(function (e) {
+      return [e.id, e.type, e.amount, e.timestamp, e.note || ''].join('|');
+    }).sort().join(',');
   }
 
   function deletedSignature(ids) {
@@ -147,7 +149,7 @@
       ignoreNextSnapshot = true;
       const snap = await docRef.get();
       const remote = snap.exists ? snap.data() : {};
-      mergeRemoteIntoState(remote.entries || [], remote.deletedIds || []);
+      mergeRemoteIntoState(remote.entries || [], remote.deletedIds || [], true);
 
       await docRef.set(buildPayload(), { merge: true });
     } catch (err) {
