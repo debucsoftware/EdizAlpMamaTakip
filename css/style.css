@@ -258,6 +258,12 @@ body {
   color: var(--text-light);
 }
 
+.stat-sublabel {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-light);
+}
+
 .encouragement {
   margin-top: 1rem;
   text-align: center;

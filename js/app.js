@@ -55,6 +55,7 @@
     statMama: document.getElementById('statMama'),
     statTotal: document.getElementById('statTotal'),
     statEmdi: document.getElementById('statEmdi'),
+    statEmdiCount: document.getElementById('statEmdiCount'),
     statKaka: document.getElementById('statKaka'),
     encouragement: document.getElementById('encouragement'),
     feedPanel: document.getElementById('feedPanel'),
@@ -239,16 +240,24 @@
     return 0;
   }
 
+  function isEmdiSession(entry) {
+    if (!entry) return false;
+    if (entry.type === 'emdi') return true;
+    if ((entry.type === 'sut' || entry.type === 'mama') && entry.note && /emdi/i.test(entry.note)) return true;
+    return false;
+  }
+
   function calcStats(entries) {
-    let sut = 0, mama = 0, kaka = 0, emdi = 0;
+    let sut = 0, mama = 0, kaka = 0, emdi = 0, emdiCount = 0;
     entries.forEach(e => {
       if (e.type === 'sut') sut += e.amount || 0;
       else if (e.type === 'mama') mama += e.amount || 0;
       else if (e.type === 'kaka') kaka++;
       emdi += getEmdiMinutes(e);
+      if (isEmdiSession(e)) emdiCount++;
     });
     return {
-      sut, mama, total: sut + mama, kaka, emdi,
+      sut, mama, total: sut + mama, kaka, emdi, emdiCount,
       feedCount: entries.filter(e => e.type === 'sut' || e.type === 'mama' || e.type === 'emdi').length
     };
   }
@@ -601,6 +610,7 @@
     els.statMama.textContent = stats.mama;
     els.statTotal.textContent = stats.total;
     if (els.statEmdi) els.statEmdi.textContent = stats.emdi;
+    if (els.statEmdiCount) els.statEmdiCount.textContent = stats.emdiCount + ' kez';
     els.statKaka.textContent = stats.kaka;
   }
 
@@ -706,7 +716,7 @@
           <div>
             <div class="history-date">${formatShortDate(dateKey)}</div>
             <div class="history-summary">
-              🍼 ${stats.sut}ml · 🍶 ${stats.mama}ml · 🤱 ${stats.emdi}dk · 💩 ${stats.kaka}
+              🍼 ${stats.sut}ml · 🍶 ${stats.mama}ml · 🤱 ${stats.emdi}dk · ${stats.emdiCount} kez · 💩 ${stats.kaka}
             </div>
           </div>
           <span class="history-arrow">›</span>
@@ -1004,7 +1014,7 @@
     report += `  🍼 Süt:    ${stats.sut} ml\n`;
     report += `  🍶 Mama:   ${stats.mama} ml\n`;
     report += `  💧 Toplam: ${stats.total} ml\n`;
-    report += `  🤱 Emzirme: ${stats.emdi} dk\n`;
+    report += `  🤱 Emzirme: ${stats.emdi} dk · ${stats.emdiCount} kez\n`;
     report += `  🍽️ Beslenme: ${stats.feedCount} kez\n`;
     report += `  💩 Kaka:   ${stats.kaka} kez\n\n`;
 
