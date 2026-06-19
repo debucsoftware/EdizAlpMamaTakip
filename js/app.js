@@ -213,13 +213,39 @@
     return entries.filter(e => getDateKeyFromTimestamp(e.timestamp) === dateKey);
   }
 
+  function parseEmdiMinutesFromNote(note) {
+    if (!note || !/emdi/i.test(note)) return 0;
+    let total = 0;
+    const saatMatch = note.match(/(\d+)\s*saat/i);
+    if (saatMatch) total += parseInt(saatMatch[1], 10) * 60;
+    const rangeMatch = note.match(/(\d+)\s*-\s*(\d+)\s*dk/i);
+    if (rangeMatch) {
+      return total + Math.round((parseInt(rangeMatch[1], 10) + parseInt(rangeMatch[2], 10)) / 2);
+    }
+    const dkMatch = note.match(/(\d+)\s*dk/i);
+    if (dkMatch) total += parseInt(dkMatch[1], 10);
+    return total;
+  }
+
+  function getEmdiMinutes(entry) {
+    if (!entry) return 0;
+    if (entry.type === 'emdi') {
+      if (entry.amount) return entry.amount;
+      return parseEmdiMinutesFromNote(entry.note);
+    }
+    if (entry.type === 'sut' || entry.type === 'mama') {
+      return parseEmdiMinutesFromNote(entry.note);
+    }
+    return 0;
+  }
+
   function calcStats(entries) {
     let sut = 0, mama = 0, kaka = 0, emdi = 0;
     entries.forEach(e => {
       if (e.type === 'sut') sut += e.amount || 0;
       else if (e.type === 'mama') mama += e.amount || 0;
       else if (e.type === 'kaka') kaka++;
-      else if (e.type === 'emdi') emdi += e.amount || 0;
+      emdi += getEmdiMinutes(e);
     });
     return {
       sut, mama, total: sut + mama, kaka, emdi,
