@@ -680,7 +680,7 @@
           <div>
             <div class="history-date">${formatShortDate(dateKey)}</div>
             <div class="history-summary">
-              🍼 ${stats.sut}ml · 🍶 ${stats.mama}ml · 💩 ${stats.kaka}
+              🍼 ${stats.sut}ml · 🍶 ${stats.mama}ml · 🤱 ${stats.emdi}dk · 💩 ${stats.kaka}
             </div>
           </div>
           <span class="history-arrow">›</span>
