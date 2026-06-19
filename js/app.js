@@ -54,6 +54,7 @@
     statSut: document.getElementById('statSut'),
     statMama: document.getElementById('statMama'),
     statTotal: document.getElementById('statTotal'),
+    statEmdi: document.getElementById('statEmdi'),
     statKaka: document.getElementById('statKaka'),
     encouragement: document.getElementById('encouragement'),
     feedPanel: document.getElementById('feedPanel'),
@@ -213,14 +214,15 @@
   }
 
   function calcStats(entries) {
-    let sut = 0, mama = 0, kaka = 0;
+    let sut = 0, mama = 0, kaka = 0, emdi = 0;
     entries.forEach(e => {
       if (e.type === 'sut') sut += e.amount || 0;
       else if (e.type === 'mama') mama += e.amount || 0;
       else if (e.type === 'kaka') kaka++;
+      else if (e.type === 'emdi') emdi += e.amount || 0;
     });
     return {
-      sut, mama, total: sut + mama, kaka,
+      sut, mama, total: sut + mama, kaka, emdi,
       feedCount: entries.filter(e => e.type === 'sut' || e.type === 'mama' || e.type === 'emdi').length
     };
   }
@@ -572,6 +574,7 @@
     els.statSut.textContent = stats.sut;
     els.statMama.textContent = stats.mama;
     els.statTotal.textContent = stats.total;
+    if (els.statEmdi) els.statEmdi.textContent = stats.emdi;
     els.statKaka.textContent = stats.kaka;
   }
 
@@ -975,6 +978,7 @@
     report += `  🍼 Süt:    ${stats.sut} ml\n`;
     report += `  🍶 Mama:   ${stats.mama} ml\n`;
     report += `  💧 Toplam: ${stats.total} ml\n`;
+    report += `  🤱 Emzirme: ${stats.emdi} dk\n`;
     report += `  🍽️ Beslenme: ${stats.feedCount} kez\n`;
     report += `  💩 Kaka:   ${stats.kaka} kez\n\n`;
 

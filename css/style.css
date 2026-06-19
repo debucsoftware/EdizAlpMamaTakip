@@ -239,6 +239,7 @@ body {
 .stat-milk { background: linear-gradient(135deg, #ffeef2, #ffd6e0); }
 .stat-formula { background: linear-gradient(135deg, #e8f4fd, #cce5ff); }
 .stat-total { background: linear-gradient(135deg, #fff9e6, #ffeaa7); }
+.stat-emdi { background: linear-gradient(135deg, #fce4ec, #f8bbd0); }
 .stat-poop { background: linear-gradient(135deg, #f0f9e8, #b8e994); }
 
 .stat-emoji {
