@@ -20,6 +20,8 @@
   let ignoreNextSnapshot = false;
   let onRemoteUpdateCallback = null;
   let ready = false;
+  let pushChain = Promise.resolve();
+  let ignoreSnapshotUntil = 0;
 
   const state = {
     entries: [],
@@ -69,6 +71,28 @@
     return uniqueIds(ids).sort().join(',');
   }
 
+  function isOnline() {
+    return typeof navigator === 'undefined' || navigator.onLine;
+  }
+
+  async function fetchDocSnap(docRef) {
+    if (isOnline()) {
+      try {
+        return await docRef.get({ source: 'server' });
+      } catch (err) {
+        console.warn('Sunucudan okunamadı, önbellek kullanılıyor:', err);
+      }
+    }
+    return docRef.get();
+  }
+
+  function shouldApplySnapshot(snap) {
+    if (ignoreNextSnapshot) return false;
+    if (Date.now() < ignoreSnapshotUntil) return false;
+    if (snap.metadata.fromCache && isOnline()) return false;
+    return true;
+  }
+
   function buildPayload() {
     return {
       entries: state.entries,
@@ -102,7 +126,7 @@
 
   async function bootstrap() {
     const docRef = db.collection(DOC_COLLECTION).doc(DOC_ID);
-    const snap = await docRef.get();
+    const snap = await fetchDocSnap(docRef);
 
     if (snap.exists) {
       const remote = snap.data();
@@ -119,8 +143,9 @@
     state.settings.babyName = (seedSettings && seedSettings.babyName) || DEFAULT_BABY_NAME;
 
     ignoreNextSnapshot = true;
+    ignoreSnapshotUntil = Date.now() + 1500;
     await docRef.set(buildPayload());
-    setTimeout(function () { ignoreNextSnapshot = false; }, 500);
+    setTimeout(function () { ignoreNextSnapshot = false; }, 1500);
 
     return {
       entryCount: state.entries.length,
@@ -132,7 +157,7 @@
     if (unsubscribe) unsubscribe();
     unsubscribe = db.collection(DOC_COLLECTION).doc(DOC_ID).onSnapshot(function (snap) {
       if (!snap.exists) return;
-      if (ignoreNextSnapshot) return;
+      if (!shouldApplySnapshot(snap)) return;
 
       const changed = applyRemote(snap.data());
       if (changed && onRemoteUpdateCallback) onRemoteUpdateCallback();
@@ -141,23 +166,33 @@
     });
   }
 
-  async function pushToFirestore() {
+  async function pushToFirestoreNow() {
     if (!db) return;
     const docRef = db.collection(DOC_COLLECTION).doc(DOC_ID);
 
     try {
       ignoreNextSnapshot = true;
-      const snap = await docRef.get();
+      ignoreSnapshotUntil = Date.now() + 1500;
+      const snap = await fetchDocSnap(docRef);
       const remote = snap.exists ? snap.data() : {};
       mergeRemoteIntoState(remote.entries || [], remote.deletedIds || [], true);
 
-      await docRef.set(buildPayload(), { merge: true });
+      await docRef.set(buildPayload());
     } catch (err) {
       console.error('Firestore kayıt hatası:', err);
       throw err;
     } finally {
-      setTimeout(function () { ignoreNextSnapshot = false; }, 500);
+      setTimeout(function () { ignoreNextSnapshot = false; }, 1500);
     }
+  }
+
+  function pushToFirestore() {
+    if (!db) return Promise.resolve();
+    pushChain = pushChain.then(pushToFirestoreNow).catch(function (err) {
+      console.error('Firestore yazma kuyruğu hatası:', err);
+      throw err;
+    });
+    return pushChain;
   }
 
   function getData() {
@@ -171,6 +206,13 @@
   function saveData(data) {
     const incoming = filterDeleted(data.entries || [], state.deletedIds);
     state.entries = mergeEntries(state.entries, incoming);
+    state.entries = filterDeleted(state.entries, state.deletedIds);
+    return pushToFirestore();
+  }
+
+  function updateEntry(entry) {
+    if (!entry || !entry.id) return Promise.resolve();
+    state.entries = mergeEntries(state.entries, [entry]);
     state.entries = filterDeleted(state.entries, state.deletedIds);
     return pushToFirestore();
   }
@@ -219,6 +261,7 @@
     getData: getData,
     getSettings: getSettings,
     saveData: saveData,
+    updateEntry: updateEntry,
     deleteEntry: deleteEntry,
     saveSettings: saveSettings
   };

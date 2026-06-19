@@ -968,6 +968,13 @@
     const [h, m] = timeVal.split(':');
     const timestamp = new Date(year, month - 1, day, parseInt(h, 10), parseInt(m, 10)).toISOString();
 
+    const existing = findEntryById(editingEntryId);
+    if (!existing) {
+      showToast('Kayıt bulunamadı');
+      closeEditModal();
+      return;
+    }
+
     const entry = {
       id: editingEntryId,
       type: editSelectedType,
@@ -979,23 +986,22 @@
       if (note) entry.note = note;
     } else if (amount !== null) {
       entry.amount = amount;
+      if (existing && existing.note) entry.note = existing.note;
     }
 
-    const data = loadData();
-    const idx = data.entries.findIndex(function (e) { return e.id === editingEntryId; });
-    if (idx === -1) {
-      showToast('Kayıt bulunamadı');
-      closeEditModal();
+    if (!window.FirestoreSync || !window.FirestoreSync.updateEntry) {
+      showToast('Kayıt kaydedilemedi ☁️');
       return;
     }
 
-    data.entries[idx] = entry;
-    saveData(data);
-
-    const cfg = TYPE_CONFIG[editSelectedType];
-    showToast(`${cfg.emoji} Kayıt güncellendi!`);
-    closeEditModal();
-    refreshEntryViews();
+    window.FirestoreSync.updateEntry(entry).then(function () {
+      const cfg = TYPE_CONFIG[editSelectedType];
+      showToast(`${cfg.emoji} Kayıt güncellendi!`);
+      closeEditModal();
+      refreshEntryViews();
+    }).catch(function () {
+      showToast('Kayıt kaydedilemedi ☁️');
+    });
   }
 
   function generateReport(dateKey) {
