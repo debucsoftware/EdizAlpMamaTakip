@@ -127,25 +127,42 @@
     });
   }
 
+  function sanitizeGrowthValue(weightG, heightCm) {
+    let safeWeightG = weightG;
+    let safeHeightCm = heightCm;
+    if (safeWeightG && (safeWeightG < 2000 || safeWeightG > 15000)) safeWeightG = null;
+    if (safeHeightCm && (safeHeightCm < 40 || safeHeightCm > 100)) safeHeightCm = null;
+    return { currentWeightG: safeWeightG, currentHeightCm: safeHeightCm };
+  }
+
   function loadSettings() {
     const synced = (window.FirestoreSync && window.FirestoreSync.isReady())
       ? window.FirestoreSync.getSettings()
       : { babyName: DEFAULT_SETTINGS.babyName };
+    const growth = sanitizeGrowthValue(synced.currentWeightG || null, synced.currentHeightCm || null);
     return {
       babyName: synced.babyName || DEFAULT_SETTINGS.babyName,
       birthDate: FIXED_BIRTH_DATE,
       birthWeightG: FIXED_BIRTH_WEIGHT_G,
       birthHeightCm: FIXED_BIRTH_HEIGHT_CM,
-      currentWeightG: synced.currentWeightG || null,
-      currentHeightCm: synced.currentHeightCm || null,
+      currentWeightG: growth.currentWeightG,
+      currentHeightCm: growth.currentHeightCm,
       groqApiKey: FIXED_GROQ_KEY
     };
   }
 
   function parseWeightKgInput(value) {
-    const kg = parseFloat(String(value).replace(',', '.'));
-    if (!Number.isFinite(kg) || kg <= 0) return null;
-    return Math.round(kg * 1000);
+    const raw = String(value).trim().replace(',', '.');
+    if (!raw) return null;
+    const num = parseFloat(raw);
+    if (!Number.isFinite(num) || num <= 0) return null;
+    if (num > 30) {
+      const grams = Math.round(num);
+      if (grams < 2000 || grams > 15000) return null;
+      return grams;
+    }
+    if (num < 2 || num > 15) return null;
+    return Math.round(num * 1000);
   }
 
   function formatWeightKgInput(grams) {
@@ -154,9 +171,27 @@
   }
 
   function parseHeightCmInput(value) {
-    const cm = parseInt(value, 10);
-    if (!Number.isFinite(cm) || cm <= 0) return null;
-    return cm;
+    const raw = String(value).trim().replace(',', '.');
+    if (!raw) return null;
+    const cm = parseFloat(raw);
+    if (!Number.isFinite(cm) || cm < 40 || cm > 100) return null;
+    return Math.round(cm * 10) / 10;
+  }
+
+  function readGrowthInputsFromForm() {
+    const heightRaw = els.currentHeightInput ? els.currentHeightInput.value : '';
+    const weightRaw = els.currentWeightInput ? els.currentWeightInput.value : '';
+    const currentHeightCm = parseHeightCmInput(heightRaw);
+    const currentWeightG = parseWeightKgInput(weightRaw);
+
+    if (String(heightRaw).trim() && currentHeightCm === null) {
+      return { error: 'Boy 40-100 cm arasında olmalı.' };
+    }
+    if (String(weightRaw).trim() && currentWeightG === null) {
+      return { error: 'Kilo 2-15 kg arasında olmalı (gram için 2000-15000).' };
+    }
+
+    return { currentHeightCm: currentHeightCm, currentWeightG: currentWeightG, error: null };
   }
 
   function formatGrowthContext(settings) {
@@ -1644,12 +1679,15 @@
 
   bindClick(els.saveSettings, function () {
     const babyName = els.babyNameInput ? els.babyNameInput.value.trim() : '';
-    const currentWeightG = els.currentWeightInput ? parseWeightKgInput(els.currentWeightInput.value) : null;
-    const currentHeightCm = els.currentHeightInput ? parseHeightCmInput(els.currentHeightInput.value) : null;
+    const growth = readGrowthInputsFromForm();
+    if (growth.error) {
+      showToast(growth.error);
+      return;
+    }
     if (!saveSettingsData({
       babyName: babyName,
-      currentWeightG: currentWeightG,
-      currentHeightCm: currentHeightCm
+      currentWeightG: growth.currentWeightG,
+      currentHeightCm: growth.currentHeightCm
     })) {
       showToast('Ayarlar kaydedilemedi ☁️');
       return;

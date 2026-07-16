@@ -206,12 +206,18 @@
 
         <p class="hint birth-info">👶 Doğum: 14 Mayıs 2026 · 3225 gr · 54 cm</p>
 
-        <label class="field-label">Güncel Boy / Kilo</label>
-        <div class="datetime-row">
-          <input type="number" id="currentWeightInput" class="input" placeholder="Kilo (kg)" min="1" max="20" step="0.01" inputmode="decimal">
-          <input type="number" id="currentHeightInput" class="input" placeholder="Boy (cm)" min="40" max="120" step="1" inputmode="numeric">
+        <label class="field-label">Güncel Ölçüler</label>
+        <div class="datetime-row growth-row">
+          <div class="field-col">
+            <label class="field-sublabel" for="currentHeightInput">Boy (cm)</label>
+            <input type="number" id="currentHeightInput" class="input" placeholder="örn: 60" min="40" max="100" step="0.1" inputmode="decimal">
+          </div>
+          <div class="field-col">
+            <label class="field-sublabel" for="currentWeightInput">Kilo (kg)</label>
+            <input type="number" id="currentWeightInput" class="input" placeholder="örn: 5.60" min="2" max="15" step="0.01" inputmode="decimal">
+          </div>
         </div>
-        <p class="hint">Güncel boy ve kilo değerlendirmeye dahil edilir. Doğum bilgisi sabittir.</p>
+        <p class="hint">Sol kutu boy (cm), sağ kutu kilo (kg). Değerlendirmeye bu sırayla dahil edilir.</p>
       </div>
       <div class="modal-footer">
         <button class="btn-primary" id="saveSettings">Kaydet</button>
@@ -309,6 +315,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script src="js/firebase-sync.js?v=16"></script>
   <script src="js/seed-data.js?v=15"></script>
-  <script src="js/app.js?v=23"></script>
+  <script src="js/app.js?v=24"></script>
 </body>
 </html>

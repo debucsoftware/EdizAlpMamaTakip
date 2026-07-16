@@ -535,6 +535,25 @@ body {
 .datetime-row .input {
   flex: 1;
   min-width: 0;
+  margin-bottom: 0;
+}
+
+.growth-row {
+  align-items: flex-end;
+}
+
+.field-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field-sublabel {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--text-light);
 }
 
 .btn-primary {
