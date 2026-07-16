@@ -624,7 +624,38 @@
       'ÖNEMLİ: Değerlendirmeyi yalnızca süt/mama ml miktarına göre yapma. Emzirme dakikaları da beslenmenin ayrılmaz parçasıdır. ml azalıp emzirme artıyorsa bunu "beslenme azalıyor" diye tek başına söyleme; emzirme artışını mutlaka belirt ve ml+emzirme dengesini birlikte yorumla.\n' +
       'Boy/kilo gelişimini (doğum: 3225 gr / 54 cm ve güncel değerler) beslenme değerlendirmesinde mutlaka dikkate al.\n' +
       'Değerlendirmeyi son 7 günün geçmişi, ortalamalar ve genel eğilim üzerinden yap. Bugünü bu bağlamda yorumla.\n' +
+      'Yanıtın TAMAMEN Türkçe olmalı. Çince, İngilizce veya başka dilde tek bir kelime/karakter bile kullanma.\n' +
       'Türkçe, sıcak, max 200 kelime. Başlıklar: 📊 Genel Değerlendirme, 📅 Bugün, 📏 Büyüme, 💡 Tavsiye, 💩 Bez, 🌈 Moral. Teşhis koyma, endişede doktora yönlendir.';
+  }
+
+  const FOREIGN_SCRIPT_RE = /[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af\u0400-\u04ff\u0600-\u06ff]/;
+
+  function containsForeignScript(text) {
+    return FOREIGN_SCRIPT_RE.test(text || '');
+  }
+
+  function sanitizeAiText(text) {
+    if (!text) return '';
+    return text
+      .replace(FOREIGN_SCRIPT_RE, '')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  function normalizeAiAdvice(text) {
+    const cleaned = sanitizeAiText(text);
+    if (!cleaned || cleaned.length < 40) return null;
+    if (containsForeignScript(cleaned)) return null;
+    return cleaned;
+  }
+
+  function getAiSystemPrompt(strictTurkish) {
+    let prompt = 'Sen deneyimli bir yenidoğan beslenme danışmanısın. Yalnızca Türkçe yaz; Çince, İngilizce veya başka dil kullanma. Türkçe karakterler ve emoji kullanabilirsin. Sıcak ve anlaşılır ol. Teşhis koyma. Değerlendirmede süt/mama ml miktarı ile emzirme dakikalarını birlikte ele al; ml azalıp emzirme artıyorsa bunu beslenme kaybı olarak yorumlama. Bebeğin doğum ve güncel boy/kilo gelişimini de beslenme yorumuna dahil et.';
+    if (strictTurkish) {
+      prompt += ' Bu yanıtta kesinlikle yabancı dil veya yabancı alfabe kullanma; her cümle tamamen Türkçe olmalı.';
+    }
+    return prompt;
   }
 
   function buildLocalAdvice(settings, age) {
@@ -740,7 +771,7 @@
     localStorage.setItem(AI_LAST_SUCCESS_KEY, JSON.stringify({ text: text, at: Date.now() }));
   }
 
-  async function callGroqApi(apiKey, prompt) {
+  async function callGroqApi(apiKey, prompt, strictTurkish) {
     let lastError = null;
     for (let i = 0; i < GROQ_MODELS.length; i++) {
       const model = GROQ_MODELS[i];
@@ -756,11 +787,11 @@
             messages: [
               {
                 role: 'system',
-                content: 'Sen deneyimli bir yenidoğan beslenme danışmanısın. Türkçe, sıcak ve anlaşılır yaz. Teşhis koyma. Değerlendirmede süt/mama ml miktarı ile emzirme dakikalarını birlikte ele al; ml azalıp emzirme artıyorsa bunu beslenme kaybı olarak yorumlama. Bebeğin doğum ve güncel boy/kilo gelişimini de beslenme yorumuna dahil et.'
+                content: getAiSystemPrompt(!!strictTurkish)
               },
               { role: 'user', content: prompt }
             ],
-            temperature: 0.7,
+            temperature: strictTurkish ? 0.4 : 0.55,
             max_tokens: 512
           })
         });
@@ -771,13 +802,26 @@
         }
         const data = await res.json();
         const text = data.choices?.[0]?.message?.content;
-        if (text) return text.trim();
+        if (text) {
+          const cleaned = normalizeAiAdvice(text);
+          if (cleaned) return cleaned;
+          lastError = new Error('Yanıt Türkçe değil');
+          continue;
+        }
         lastError = new Error('Yanıt alınamadı');
       } catch (e) {
         lastError = e;
       }
     }
     throw lastError || new Error('Groq modelleri başarısız');
+  }
+
+  function requestAiAdvice(settings, age) {
+    const prompt = buildAiPrompt(settings, age);
+    return callGroqApi(settings.groqApiKey, prompt, false).catch(function () {
+      const strictPrompt = prompt + '\n\nSON UYARI: Yanıt tamamen Türkçe olmalı. Çince, İngilizce veya başka dilde tek kelime bile yazma.';
+      return callGroqApi(settings.groqApiKey, strictPrompt, true);
+    });
   }
 
   function trySilentAiAdvice(forceRefresh) {
@@ -789,8 +833,11 @@
     if (!forceRefresh) {
       const cached = loadCachedAdvice();
       if (cached && cached.text) {
-        showAiAdvice(cached.text, 'ai');
-        return;
+        const cleanCached = normalizeAiAdvice(cached.text);
+        if (cleanCached) {
+          showAiAdvice(cleanCached, 'ai');
+          return;
+        }
       }
     }
     if (lastApiCallAt && now - lastApiCallAt < AI_MIN_GAP_MS) return;
@@ -798,8 +845,7 @@
 
     aiLoading = true;
     setAdviceSource('loading');
-    const prompt = buildAiPrompt(settings, age);
-    callGroqApi(settings.groqApiKey, prompt).then(function (text) {
+    requestAiAdvice(settings, age).then(function (text) {
       lastApiCallAt = Date.now();
       saveCachedAdvice(text);
       saveLastSuccessAdvice(text);
@@ -828,7 +874,8 @@
   }
 
   function showAiAdvice(text, source) {
-    els.aiContent.textContent = text;
+    const cleanText = source === 'ai' ? (normalizeAiAdvice(text) || text) : text;
+    els.aiContent.textContent = cleanText;
     els.aiContent.hidden = false;
     els.aiPlaceholder.hidden = true;
     if (source) setAdviceSource(source);
@@ -1485,18 +1532,20 @@
     let report = '📊 ' + name + ' - Haftalık Rapor (Son 7 Gün)\n';
     report += '='.repeat(30) + '\n\n';
 
-    days.forEach(function (d) {
+    days.slice().reverse().forEach(function (d) {
       report += formatDate(d.dateKey) + '\n';
-      report += '  🍼 Süt: ' + d.sut + ' ml  🍶 Mama: ' + d.mama + ' ml  💧 Toplam: ' + d.total + ' ml  💩 ' + d.kaka + ' bez\n\n';
+      report += '  🍼 Süt: ' + d.sut + ' ml  🍶 Mama: ' + d.mama + ' ml  💧 Toplam: ' + d.total + ' ml  🤱 Emzirme: ' + (d.emdi || 0) + ' dk  💩 ' + d.kaka + ' bez\n\n';
     });
 
     const sumSut = days.reduce(function (s, d) { return s + d.sut; }, 0);
     const sumMama = days.reduce(function (s, d) { return s + d.mama; }, 0);
     const sumTotal = sumSut + sumMama;
+    const sumEmdi = days.reduce(function (s, d) { return s + (d.emdi || 0); }, 0);
     report += '📈 HAFTA TOPLAMI\n';
     report += '  🍼 Süt: ' + sumSut + ' ml\n';
     report += '  🍶 Mama: ' + sumMama + ' ml\n';
     report += '  💧 Toplam: ' + sumTotal + ' ml\n';
+    report += '  🤱 Emzirme: ' + sumEmdi + ' dk\n';
     report += '  📊 Günlük ortalama: ' + Math.round(sumTotal / 7) + ' ml\n';
     report += '\n' + '='.repeat(30) + '\nBebiş Takip 👶';
     return report;
