@@ -1186,15 +1186,18 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
-    const pad = { top: 28, right: 12, bottom: 40, left: 38 };
+    const pad = { top: 28, right: 34, bottom: 40, left: 44 };
     const chartW = w - pad.left - pad.right;
     const chartH = h - pad.top - pad.bottom;
     const maxVal = Math.max(100, ...days.map(function (d) { return d.total; }));
     const niceMax = Math.ceil(maxVal / 100) * 100;
+    const maxEmdi = Math.max(1, ...days.map(function (d) { return d.emdi || 0; }));
+    const emdiAxisMax = Math.max(10, Math.ceil(maxEmdi / 10) * 10);
 
     for (let i = 0; i <= 4; i++) {
       const y = pad.top + chartH * (1 - i / 4);
       const val = Math.round(niceMax * i / 4);
+      const emdiVal = Math.round(emdiAxisMax * i / 4);
       ctx.strokeStyle = '#ececec';
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -1204,7 +1207,10 @@
       ctx.fillStyle = '#888';
       ctx.font = '600 10px Nunito, sans-serif';
       ctx.textAlign = 'right';
-      ctx.fillText(String(val), pad.left - 5, y + 3);
+      ctx.fillText(val + ' ml', pad.left - 5, y + 3);
+      ctx.fillStyle = '#22c55e';
+      ctx.textAlign = 'left';
+      ctx.fillText(emdiVal + ' dk', pad.left + chartW + 5, y + 3);
     }
 
     const xAt = function (i) {
@@ -1240,9 +1246,8 @@
     drawLine('total', '#f59e0b', 3, true);
 
     // Emzirme süreleri (dk) - dikey çizgiler
-    const maxEmdi = Math.max(1, ...days.map(function (d) { return d.emdi || 0; }));
     const yAtEmdi = function (val) {
-      return pad.top + chartH * (1 - (val || 0) / maxEmdi);
+      return pad.top + chartH * (1 - (val || 0) / emdiAxisMax);
     };
     ctx.strokeStyle = '#22c55e';
     ctx.lineWidth = 2;
