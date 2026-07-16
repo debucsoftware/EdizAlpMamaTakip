@@ -801,8 +801,7 @@
 
     const dates = Object.keys(dateMap)
       .filter(d => d !== todayKey())
-      .sort((a, b) => b.localeCompare(a))
-      .slice(0, 30);
+      .sort((a, b) => b.localeCompare(a));
 
     if (dates.length === 0) {
       els.historyList.innerHTML = '<p class="empty-state">Henüz geçmiş kayıt yok.</p>';
