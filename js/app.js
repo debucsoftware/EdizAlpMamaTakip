@@ -42,6 +42,7 @@
   let editingEntryId = null;
   let editSelectedType = 'sut';
   let aiLoading = false;
+  let currentAdviceSource = 'local';
   let lastAdviceHour = new Date().getHours();
   let lastApiCallAt = 0;
   let aiRefreshTimer = null;
@@ -322,6 +323,74 @@
     return result;
   }
 
+  function getHistoricalOverview(daysBack) {
+    const data = loadData();
+    const days = [];
+    for (let i = daysBack - 1; i >= 0; i--) {
+      const key = shiftDateKey(todayKey(), -i);
+      const entries = getEntriesForDate(data.entries, key);
+      const stats = calcStats(entries);
+      days.push({
+        dateKey: key,
+        label: formatShortDate(key),
+        sut: stats.sut,
+        mama: stats.mama,
+        total: stats.total,
+        kaka: stats.kaka,
+        emdi: stats.emdi,
+        emdiCount: stats.emdiCount,
+        feedCount: stats.feedCount,
+        hasData: entries.length > 0
+      });
+    }
+
+    const recordedDays = days.filter(function (d) { return d.hasData; });
+    const count = recordedDays.length;
+    const sum = function (key) {
+      return recordedDays.reduce(function (s, d) { return s + (d[key] || 0); }, 0);
+    };
+    const avg = function (key) {
+      return count ? Math.round(sum(key) / count) : 0;
+    };
+
+    const recent3 = recordedDays.slice(-3);
+    const prev3 = recordedDays.slice(-6, -3);
+    const avgRecent3 = recent3.length
+      ? Math.round(recent3.reduce(function (s, d) { return s + d.total; }, 0) / recent3.length)
+      : 0;
+    const avgPrev3 = prev3.length
+      ? Math.round(prev3.reduce(function (s, d) { return s + d.total; }, 0) / prev3.length)
+      : 0;
+
+    let trend = 'Yeterli geçmiş kayıt yok.';
+    if (recent3.length && prev3.length) {
+      if (avgRecent3 > avgPrev3 * 1.1) trend = 'Son günlerde beslenme miktarı artış eğiliminde.';
+      else if (avgRecent3 < avgPrev3 * 0.9) trend = 'Son günlerde beslenme miktarı azalış eğiliminde.';
+      else trend = 'Son günlerde beslenme miktarı genel olarak stabil.';
+    } else if (recent3.length >= 2) {
+      const first = recent3[0].total;
+      const last = recent3[recent3.length - 1].total;
+      if (last > first * 1.15) trend = 'Kısa dönemde beslenme artış eğiliminde.';
+      else if (last < first * 0.85) trend = 'Kısa dönemde beslenme azalış eğiliminde.';
+      else trend = 'Kısa dönemde beslenme stabil görünüyor.';
+    }
+
+    return {
+      days: days,
+      recordedDays: count,
+      avgTotal: avg('total'),
+      avgSut: avg('sut'),
+      avgMama: avg('mama'),
+      avgEmdi: avg('emdi'),
+      avgEmdiCount: avg('emdiCount'),
+      avgKaka: avg('kaka'),
+      avgFeedCount: avg('feedCount'),
+      trend: trend,
+      avgRecent3: avgRecent3,
+      avgPrev3: avgPrev3
+    };
+  }
+
   function getTodaySummaryText() {
     const data = loadData();
     const entries = getEntriesForDate(data.entries, todayKey())
@@ -341,7 +410,8 @@
     const data = loadData();
     const todayEntries = getEntriesForDate(data.entries, todayKey());
     const stats = calcStats(todayEntries);
-    return AI_CACHE_PREFIX + todayKey() + '_h' + hour + '_' + stats.total + '_' + stats.kaka + '_' + todayEntries.length;
+    const history = getHistoricalOverview(7);
+    return AI_CACHE_PREFIX + todayKey() + '_h' + hour + '_' + stats.total + '_' + stats.kaka + '_' + todayEntries.length + '_a' + history.avgTotal + '_d' + history.recordedDays;
   }
 
   function loadCachedAdvice() {
@@ -368,21 +438,27 @@
     const data = loadData();
     const todayEntries = getEntriesForDate(data.entries, todayKey());
     const stats = calcStats(todayEntries);
-    const recent = getRecentDayStats(3);
+    const history = getHistoricalOverview(7);
     const name = settings.babyName.trim() || 'Bebek';
-    const recentText = recent.map(d => d.total + 'ml').join(', ') || 'yok';
+    const dayLines = history.days.map(function (d) {
+      if (!d.hasData) return d.label + ': kayıt yok';
+      return d.label + ': toplam ' + d.total + 'ml (süt ' + d.sut + ', mama ' + d.mama + '), ' + d.feedCount + ' beslenme, ' + d.emdi + 'dk emzirme, ' + d.kaka + ' bez';
+    }).join('\n');
 
-    return name + ', ' + age.days + ' günlük bebek. Bugün: süt ' + stats.sut + 'ml, mama ' + stats.mama + 'ml, toplam ' + stats.total + 'ml, ' + stats.feedCount + ' beslenme, ' + stats.kaka + ' bez. Son 3 gün toplamları: ' + recentText + '.\nTürkçe, sıcak, max 150 kelime. Başlıklar: 📊 Değerlendirme, 💡 Tavsiye, 💩 Bez, 🌈 Moral. Teşhis koyma, endişede doktora yönlendir.';
+    return name + ', ' + age.days + ' günlük bebek (' + age.weeks + ' hafta ' + age.remainDays + ' gün).\n\n' +
+      'BUGÜN: süt ' + stats.sut + 'ml, mama ' + stats.mama + 'ml, toplam ' + stats.total + 'ml, ' + stats.feedCount + ' beslenme, ' + stats.emdi + 'dk emzirme (' + stats.emdiCount + ' kez), ' + stats.kaka + ' bez.\n\n' +
+      'SON 7 GÜN:\n' + dayLines + '\n\n' +
+      'GENEL ORTALAMALAR (' + history.recordedDays + ' kayıtlı gün): günlük ort. ' + history.avgTotal + 'ml (süt ' + history.avgSut + ', mama ' + history.avgMama + '), ort. ' + history.avgFeedCount + ' beslenme, ort. ' + history.avgEmdi + 'dk emzirme, ort. ' + history.avgKaka + ' bez.\n' +
+      'TREND: ' + history.trend + '\n\n' +
+      'Değerlendirmeyi yalnızca bugüne göre değil; son 7 günün geçmişi, ortalamalar ve genel eğilim üzerinden yap. Bugünü bu bağlamda yorumla.\n' +
+      'Türkçe, sıcak, max 200 kelime. Başlıklar: 📊 Genel Değerlendirme, 📅 Bugün, 💡 Tavsiye, 💩 Bez, 🌈 Moral. Teşhis koyma, endişede doktora yönlendir.';
   }
 
   function buildLocalAdvice(settings, age) {
     const data = loadData();
     const stats = calcStats(getEntriesForDate(data.entries, todayKey()));
+    const history = getHistoricalOverview(7);
     const name = settings.babyName.trim() || 'Bebek';
-    const recent = getRecentDayStats(3);
-    const avgTotal = recent.length
-      ? Math.round(recent.reduce(function (s, d) { return s + d.total; }, 0) / recent.length)
-      : 0;
 
     let minMl = 450;
     let maxMl = 750;
@@ -401,50 +477,73 @@
       feedTarget = '6-9';
     }
 
-    let evalText;
-    if (stats.total === 0) {
-      evalText = 'Henüz bugün beslenme kaydı yok. Kayıt girdikçe değerlendirme güncellenecek.';
-    } else if (stats.total < minMl) {
-      evalText = 'Bugün toplam ' + stats.total + ' ml — yaşı için beklenen aralığın (' + minMl + '-' + maxMl + ' ml) altında.';
-    } else if (stats.total > maxMl) {
-      evalText = 'Bugün toplam ' + stats.total + ' ml — üst sınıra yakın veya üzerinde. Bebeğin tok ve rahat olduğunu gözlemleyin.';
+    let generalText;
+    if (history.recordedDays === 0) {
+      generalText = 'Henüz yeterli geçmiş kayıt yok. Birkaç gün kayıt girdikçe genel değerlendirme oluşacak.';
     } else {
-      evalText = 'Bugün toplam ' + stats.total + ' ml — ' + age.weeks + ' haftalık bebek için uygun aralıkta (' + minMl + '-' + maxMl + ' ml).';
+      let rangeText;
+      if (history.avgTotal < minMl) {
+        rangeText = 'Son ' + history.recordedDays + ' günde günlük ortalama ' + history.avgTotal + ' ml — yaşı için beklenen aralığın (' + minMl + '-' + maxMl + ' ml) altında.';
+      } else if (history.avgTotal > maxMl) {
+        rangeText = 'Son ' + history.recordedDays + ' günde günlük ortalama ' + history.avgTotal + ' ml — üst sınıra yakın veya üzerinde.';
+      } else {
+        rangeText = 'Son ' + history.recordedDays + ' günde günlük ortalama ' + history.avgTotal + ' ml — ' + age.weeks + ' haftalık bebek için genel olarak uygun aralıkta (' + minMl + '-' + maxMl + ' ml).';
+      }
+
+      let feedGeneral;
+      if (history.avgFeedCount < 5) {
+        feedGeneral = 'Ortalama ' + history.avgFeedCount + ' beslenme/gün; bu yaşta genelde ' + feedTarget + ' beslenme hedeflenir.';
+      } else {
+        feedGeneral = 'Ortalama ' + history.avgFeedCount + ' beslenme/gün ile sıklık genel olarak normal görünüyor (hedef: ' + feedTarget + '/gün).';
+      }
+
+      const mixGeneral = history.avgTotal
+        ? ' Ortalama ' + history.avgSut + ' ml süt ve ' + history.avgMama + ' ml mama.'
+        : '';
+      const emdiGeneral = history.avgEmdi
+        ? ' Ortalama günlük emzirme: ' + history.avgEmdi + ' dk (' + history.avgEmdiCount + ' kez).'
+        : '';
+
+      generalText = rangeText + mixGeneral + ' ' + feedGeneral + emdiGeneral + ' ' + history.trend;
     }
 
-    let feedText;
-    if (stats.feedCount === 0) {
-      feedText = 'Beslenme kaydı bekleniyor.';
-    } else if (stats.feedCount < 5) {
-      feedText = stats.feedCount + ' beslenme var. Bu yaşta genelde günde ' + feedTarget + ' beslenme hedeflenir.';
+    let todayText;
+    if (stats.total === 0) {
+      todayText = 'Bugün henüz beslenme kaydı yok.';
+    } else if (history.avgTotal) {
+      const diffPct = Math.round(((stats.total - history.avgTotal) / history.avgTotal) * 100);
+      const diffLabel = diffPct > 10 ? 'ortalamanın üzerinde (+' + diffPct + '%)' :
+        diffPct < -10 ? 'ortalamanın altında (' + diffPct + '%)' :
+        '7 günlük ortalamaya (' + history.avgTotal + ' ml) yakın';
+      todayText = 'Bugün toplam ' + stats.total + ' ml — genel ortalamaya göre ' + diffLabel + '. ' + stats.feedCount + ' beslenme, ' + stats.emdi + ' dk emzirme.';
+    } else if (stats.total < minMl) {
+      todayText = 'Bugün toplam ' + stats.total + ' ml — yaşı için beklenen aralığın (' + minMl + '-' + maxMl + ' ml) altında.';
+    } else if (stats.total > maxMl) {
+      todayText = 'Bugün toplam ' + stats.total + ' ml — üst sınıra yakın veya üzerinde.';
     } else {
-      feedText = stats.feedCount + ' beslenme ile sıklık normal görünüyor (hedef: ' + feedTarget + '/gün).';
+      todayText = 'Bugün toplam ' + stats.total + ' ml — yaşı için uygun aralıkta.';
     }
 
     let bezText;
-    if (stats.kaka === 0) {
+    const bezRef = history.avgKaka || stats.kaka;
+    if (bezRef === 0) {
       bezText = 'Henüz bez kaydı yok. Günde 4-6 ıslak bez genelde iyidir.';
-    } else if (stats.kaka < 4) {
-      bezText = stats.kaka + ' bez kaydı — takibe devam edin.';
+    } else if (history.avgKaka && history.avgKaka < 4) {
+      bezText = 'Genel ortalama ' + history.avgKaka + ' bez/gün — takibe devam edin. Bugün ' + stats.kaka + ' bez.';
     } else {
-      bezText = stats.kaka + ' bez değişimi — bu yaş için normal aralıkta.';
+      bezText = 'Genel ortalama ' + (history.avgKaka || stats.kaka) + ' bez/gün — bu yaş için normal aralıkta. Bugün ' + stats.kaka + ' bez.';
     }
 
-    const trend = avgTotal && stats.total
-      ? (stats.total > avgTotal * 1.15 ? 'Son günlere göre bugün daha yüksek.' :
-        stats.total < avgTotal * 0.85 ? 'Son günlere göre bugün daha düşük.' :
-        'Son 3 gün ortalamasına (' + avgTotal + ' ml) yakın.')
-      : '';
+    const recentDaysText = history.days
+      .filter(function (d) { return d.hasData; })
+      .map(function (d) { return d.label + ' ' + d.total + 'ml'; })
+      .join(', ');
 
-    const sutPct = stats.total ? Math.round((stats.sut / stats.total) * 100) : 0;
-    let mixText = '';
-    if (stats.total > 0) {
-      mixText = ' Bugün ' + stats.sut + ' ml süt (%' + sutPct + ') ve ' + stats.mama + ' ml mama.';
-    }
-
-    return '📊 BUGÜNKÜ DEĞERLENDİRME\n' + evalText + mixText + ' ' + feedText + ' ' + trend +
-      '\n\n💡 GÜNLÜK TAVSİYE\n' + name + ' şu an ' + age.weeks + ' hafta ' + age.remainDays + ' günlük. ' +
-      'Beslenmeler arası 2-3 saat genelde uygundur. Emzirme sonrası takviye mama verirken bebeğin doyduğunu gözlemleyin. Kayıtları düzenli tutmanız harika!\n\n' +
+    return '📊 GENEL DEĞERLENDİRME (Son 7 gün)\n' + generalText +
+      (recentDaysText ? '\nGünlük toplamlar: ' + recentDaysText + '.' : '') +
+      '\n\n📅 BUGÜN\n' + todayText +
+      '\n\n💡 TAVSİYE\n' + name + ' şu an ' + age.weeks + ' hafta ' + age.remainDays + ' günlük. ' +
+      'Beslenmeler arası 2-3 saat genelde uygundur. Geçmiş kayıtlara göre düzenli takip yapıyorsunuz; emzirme ve mama dengesini bu genel eğilime göre gözlemleyin.\n\n' +
       '💩 BEZ/KAKA NOTU\n' + bezText +
       '\n\n🌈 MORAL\n' + name + ' için harika bir ebeveynsiniz, böyle devam! 💕';
   }
@@ -535,6 +634,7 @@
 
   function setAdviceSource(source) {
     if (!els.aiSourceBadge) return;
+    currentAdviceSource = source;
     els.aiSourceBadge.className = 'ai-source-badge';
     if (source === 'ai') {
       els.aiSourceBadge.classList.add('ai-source-ai');
@@ -625,7 +725,7 @@
       els.reportContent.textContent = generateReport(activeReportDateKey);
       renderReportEntries(activeReportDateKey);
     }
-    updateLocalAdvice();
+    if (currentAdviceSource !== 'ai') updateLocalAdvice();
     scheduleAiRefresh();
   }
 
@@ -1068,7 +1168,8 @@
         sut: stats.sut,
         mama: stats.mama,
         total: stats.total,
-        kaka: stats.kaka
+        kaka: stats.kaka,
+        emdi: stats.emdi
       });
     }
     return days;
@@ -1138,6 +1239,25 @@
     drawLine('mama', '#7ec8e3', 2.5, false);
     drawLine('total', '#f59e0b', 3, true);
 
+    // Emzirme süreleri (dk) - dikey çizgiler
+    const maxEmdi = Math.max(1, ...days.map(function (d) { return d.emdi || 0; }));
+    const yAtEmdi = function (val) {
+      return pad.top + chartH * (1 - (val || 0) / maxEmdi);
+    };
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.65;
+    days.forEach(function (day, i) {
+      const x = xAt(i);
+      const y = yAtEmdi(day.emdi);
+      const yBase = pad.top + chartH;
+      ctx.beginPath();
+      ctx.moveTo(x, yBase);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+
     days.forEach(function (day, i) {
       ctx.fillStyle = '#555';
       ctx.font = '700 10px Nunito, sans-serif';
@@ -1148,7 +1268,8 @@
     const legends = [
       { label: '🍼 Süt', color: '#ff91a4' },
       { label: '🍶 Mama', color: '#7ec8e3' },
-      { label: '💧 Toplam', color: '#f59e0b' }
+      { label: '💧 Toplam', color: '#f59e0b' },
+      { label: '🤱 Emzirme', color: '#22c55e' }
     ];
     let lx = pad.left;
     legends.forEach(function (leg) {
