@@ -24,7 +24,8 @@
     sut: { emoji: '🍼', label: 'Süt', color: 'sut' },
     mama: { emoji: '🍶', label: 'Mama', color: 'mama' },
     kaka: { emoji: '💩', label: 'Bez', color: 'kaka' },
-    emdi: { emoji: '🤱', label: 'Emzirme', color: 'sut' }
+    emdi: { emoji: '🤱', label: 'Emzirme', color: 'sut' },
+    uyku: { emoji: '😴', label: 'Uyku', color: 'uyku' }
   };
 
   const ENCOURAGEMENTS = [
@@ -41,6 +42,7 @@
   let selectedType = 'sut';
   let selectedPreset = null;
   let selectedEmdiPreset = null;
+  let selectedUykuPreset = null;
   let editingEntryId = null;
   let editSelectedType = 'sut';
   let aiLoading = false;
@@ -59,11 +61,15 @@
     statTotal: document.getElementById('statTotal'),
     statEmdi: document.getElementById('statEmdi'),
     statEmdiCount: document.getElementById('statEmdiCount'),
+    statUyku: document.getElementById('statUyku'),
+    statUykuCount: document.getElementById('statUykuCount'),
     statKaka: document.getElementById('statKaka'),
     encouragement: document.getElementById('encouragement'),
     feedPanel: document.getElementById('feedPanel'),
     emdiPanel: document.getElementById('emdiPanel'),
     emdiInput: document.getElementById('emdiInput'),
+    uykuPanel: document.getElementById('uykuPanel'),
+    uykuInput: document.getElementById('uykuInput'),
     bezPanel: document.getElementById('bezPanel'),
     noteInput: document.getElementById('noteInput'),
     amountInput: document.getElementById('amountInput'),
@@ -96,9 +102,11 @@
     saveEdit: document.getElementById('saveEdit'),
     editFeedPanel: document.getElementById('editFeedPanel'),
     editEmdiPanel: document.getElementById('editEmdiPanel'),
+    editUykuPanel: document.getElementById('editUykuPanel'),
     editBezPanel: document.getElementById('editBezPanel'),
     editAmountInput: document.getElementById('editAmountInput'),
     editEmdiInput: document.getElementById('editEmdiInput'),
+    editUykuInput: document.getElementById('editUykuInput'),
     editNoteInput: document.getElementById('editNoteInput'),
     editDateInput: document.getElementById('editDateInput'),
     editTimeInput: document.getElementById('editTimeInput'),
@@ -286,6 +294,12 @@
       if (dur) return `${dur} · ${time}`;
       return entry.note ? `${time} · ${entry.note}` : time;
     }
+    if (entry.type === 'uyku') {
+      const dur = entry.amount ? `${entry.amount} dk` : '';
+      if (dur && entry.note) return `${dur} · ${time} · ${entry.note}`;
+      if (dur) return `${dur} · ${time}`;
+      return entry.note ? `${time} · ${entry.note}` : time;
+    }
     const ml = `${entry.amount || '?'} ml · ${time}`;
     return entry.note ? `${ml} · ${entry.note}` : ml;
   }
@@ -382,16 +396,20 @@
   }
 
   function calcStats(entries) {
-    let sut = 0, mama = 0, kaka = 0, emdi = 0, emdiCount = 0;
+    let sut = 0, mama = 0, kaka = 0, emdi = 0, emdiCount = 0, uyku = 0, uykuCount = 0;
     entries.forEach(e => {
       if (e.type === 'sut') sut += e.amount || 0;
       else if (e.type === 'mama') mama += e.amount || 0;
       else if (e.type === 'kaka') kaka++;
+      else if (e.type === 'uyku') {
+        uyku += e.amount || 0;
+        uykuCount++;
+      }
       emdi += getEmdiMinutes(e);
       if (isEmdiSession(e)) emdiCount++;
     });
     return {
-      sut, mama, total: sut + mama, kaka, emdi, emdiCount,
+      sut, mama, total: sut + mama, kaka, emdi, emdiCount, uyku, uykuCount,
       feedCount: entries.filter(e => e.type === 'sut' || e.type === 'mama' || e.type === 'emdi').length
     };
   }
@@ -472,6 +490,8 @@
         kaka: stats.kaka,
         emdi: stats.emdi,
         emdiCount: stats.emdiCount,
+        uyku: stats.uyku,
+        uykuCount: stats.uykuCount,
         feedCount: stats.feedCount,
         hasData: entries.length > 0
       });
@@ -547,6 +567,8 @@
       avgMama: avg('mama'),
       avgEmdi: avg('emdi'),
       avgEmdiCount: avg('emdiCount'),
+      avgUyku: avg('uyku'),
+      avgUykuCount: avg('uykuCount'),
       avgKaka: avg('kaka'),
       avgFeedCount: avg('feedCount'),
       trend: trend,
@@ -567,6 +589,7 @@
       const time = formatTime(e.timestamp);
       if (e.type === 'kaka') return `${time} bez${e.note ? ' (' + e.note + ')' : ''}`;
       if (e.type === 'emdi') return `${time} ${e.amount || '?'}dk emzirme${e.note ? ' (' + e.note + ')' : ''}`;
+      if (e.type === 'uyku') return `${time} ${e.amount || '?'}dk uyku${e.note ? ' (' + e.note + ')' : ''}`;
       if (e.type === 'sut') return `${time} ${e.amount}ml süt${e.note ? ' (' + e.note + ')' : ''}`;
       if (e.type === 'mama') return `${time} ${e.amount}ml mama${e.note ? ' (' + e.note + ')' : ''}`;
       return time;
@@ -610,14 +633,14 @@
     const name = settings.babyName.trim() || 'Bebek';
     const dayLines = history.days.map(function (d) {
       if (!d.hasData) return d.label + ': kayıt yok';
-      return d.label + ': toplam ' + d.total + 'ml (süt ' + d.sut + ', mama ' + d.mama + '), ' + d.feedCount + ' beslenme, ' + d.emdi + 'dk emzirme, ' + d.kaka + ' bez';
+      return d.label + ': toplam ' + d.total + 'ml (süt ' + d.sut + ', mama ' + d.mama + '), ' + d.feedCount + ' beslenme, ' + d.emdi + 'dk emzirme, ' + (d.uyku || 0) + 'dk uyku, ' + d.kaka + ' bez';
     }).join('\n');
 
     return name + ', ' + age.days + ' günlük bebek (' + age.weeks + ' hafta ' + age.remainDays + ' gün).\n\n' +
       'BOY/KİLO: ' + formatGrowthContext(settings) + '\n\n' +
-      'BUGÜN: süt ' + stats.sut + 'ml, mama ' + stats.mama + 'ml, toplam ' + stats.total + 'ml, ' + stats.feedCount + ' beslenme, ' + stats.emdi + 'dk emzirme (' + stats.emdiCount + ' kez), ' + stats.kaka + ' bez.\n\n' +
+      'BUGÜN: süt ' + stats.sut + 'ml, mama ' + stats.mama + 'ml, toplam ' + stats.total + 'ml, ' + stats.feedCount + ' beslenme, ' + stats.emdi + 'dk emzirme (' + stats.emdiCount + ' kez), ' + stats.uyku + 'dk uyku (' + stats.uykuCount + ' kez), ' + stats.kaka + ' bez.\n\n' +
       'SON 7 GÜN:\n' + dayLines + '\n\n' +
-      'GENEL ORTALAMALAR (' + history.recordedDays + ' kayıtlı gün): günlük ort. ' + history.avgTotal + 'ml (süt ' + history.avgSut + ', mama ' + history.avgMama + '), ort. ' + history.avgFeedCount + ' beslenme, ort. ' + history.avgEmdi + 'dk emzirme (' + history.avgEmdiCount + ' kez), ort. ' + history.avgKaka + ' bez.\n' +
+      'GENEL ORTALAMALAR (' + history.recordedDays + ' kayıtlı gün): günlük ort. ' + history.avgTotal + 'ml (süt ' + history.avgSut + ', mama ' + history.avgMama + '), ort. ' + history.avgFeedCount + ' beslenme, ort. ' + history.avgEmdi + 'dk emzirme (' + history.avgEmdiCount + ' kez), ort. ' + history.avgUyku + 'dk uyku (' + history.avgUykuCount + ' kez), ort. ' + history.avgKaka + ' bez.\n' +
       'ML TREND: ' + history.mlTrend + ' (son 3 gün ort. ' + history.avgRecent3 + 'ml, önceki 3 gün ort. ' + history.avgPrev3 + 'ml)\n' +
       'EMZİRME TREND: ' + history.emdiTrend + ' (son 3 gün ort. ' + history.avgRecent3Emdi + 'dk, önceki 3 gün ort. ' + history.avgPrev3Emdi + 'dk)\n' +
       'BİRLEŞİK YORUM: ' + history.trend + '\n\n' +
@@ -651,7 +674,7 @@
   }
 
   function getAiSystemPrompt(strictTurkish) {
-    let prompt = 'Sen deneyimli bir yenidoğan beslenme danışmanısın. Yalnızca Türkçe yaz; Çince, İngilizce veya başka dil kullanma. Türkçe karakterler ve emoji kullanabilirsin. Sıcak ve anlaşılır ol. Teşhis koyma. Değerlendirmede süt/mama ml miktarı ile emzirme dakikalarını birlikte ele al; ml azalıp emzirme artıyorsa bunu beslenme kaybı olarak yorumlama. Bebeğin doğum ve güncel boy/kilo gelişimini de beslenme yorumuna dahil et.';
+    let prompt = 'Sen deneyimli bir yenidoğan beslenme danışmanısın. Yalnızca Türkçe yaz; Çince, İngilizce veya başka dil kullanma. Türkçe karakterler ve emoji kullanabilirsin. Sıcak ve anlaşılır ol. Teşhis koyma. Değerlendirmede süt/mama ml miktarı ile emzirme ve uyku dakikalarını birlikte ele al; ml azalıp emzirme artıyorsa bunu beslenme kaybı olarak yorumlama. Bebeğin doğum ve güncel boy/kilo gelişimini de beslenme yorumuna dahil et.';
     if (strictTurkish) {
       prompt += ' Bu yanıtta kesinlikle yabancı dil veya yabancı alfabe kullanma; her cümle tamamen Türkçe olmalı.';
     }
@@ -710,8 +733,11 @@
       const emdiGeneral = history.avgEmdi
         ? ' Ortalama günlük emzirme: ' + history.avgEmdi + ' dk (' + history.avgEmdiCount + ' kez).'
         : '';
+      const uykuGeneral = history.avgUyku
+        ? ' Ortalama günlük uyku: ' + history.avgUyku + ' dk (' + history.avgUykuCount + ' kez).'
+        : '';
 
-      generalText = rangeText + mixGeneral + ' ' + feedGeneral + emdiGeneral + ' ' + history.trend;
+      generalText = rangeText + mixGeneral + ' ' + feedGeneral + emdiGeneral + uykuGeneral + ' ' + history.trend;
     }
 
     let todayText;
@@ -722,7 +748,7 @@
       const diffLabel = diffPct > 10 ? 'ortalamanın üzerinde (+' + diffPct + '%)' :
         diffPct < -10 ? 'ortalamanın altında (' + diffPct + '%)' :
         '7 günlük ortalamaya (' + history.avgTotal + ' ml) yakın';
-      todayText = 'Bugün toplam ' + stats.total + ' ml — genel ortalamaya göre ' + diffLabel + '. ' + stats.feedCount + ' beslenme, ' + stats.emdi + ' dk emzirme.';
+      todayText = 'Bugün toplam ' + stats.total + ' ml — genel ortalamaya göre ' + diffLabel + '. ' + stats.feedCount + ' beslenme, ' + stats.emdi + ' dk emzirme, ' + stats.uyku + ' dk uyku.';
     } else if (stats.total < minMl) {
       todayText = 'Bugün toplam ' + stats.total + ' ml — yaşı için beklenen aralığın (' + minMl + '-' + maxMl + ' ml) altında.';
     } else if (stats.total > maxMl) {
@@ -743,7 +769,7 @@
 
     const recentDaysText = history.days
       .filter(function (d) { return d.hasData; })
-      .map(function (d) { return d.label + ' ' + d.total + 'ml + ' + d.emdi + 'dk emzirme'; })
+      .map(function (d) { return d.label + ' ' + d.total + 'ml + ' + d.emdi + 'dk emzirme + ' + (d.uyku || 0) + 'dk uyku'; })
       .join(', ');
 
     const growthText = buildGrowthAdvice(settings, age);
@@ -937,6 +963,8 @@
     els.statTotal.textContent = stats.total;
     if (els.statEmdi) els.statEmdi.textContent = stats.emdi;
     if (els.statEmdiCount) els.statEmdiCount.textContent = stats.emdiCount + ' kez';
+    if (els.statUyku) els.statUyku.textContent = stats.uyku;
+    if (els.statUykuCount) els.statUykuCount.textContent = stats.uykuCount + ' kez';
     els.statKaka.textContent = stats.kaka;
   }
 
@@ -965,6 +993,7 @@
     let typeLabel = cfg.label;
     if (entry.type === 'kaka' && entry.note) typeLabel = `${cfg.label} · ${entry.note}`;
     else if (entry.type === 'emdi' && entry.amount) typeLabel = `${cfg.label} · ${entry.amount} dk`;
+    else if (entry.type === 'uyku' && entry.amount) typeLabel = `${cfg.label} · ${entry.amount} dk`;
 
     return `
       <li class="timeline-item ${cfg.color}">
@@ -1041,7 +1070,7 @@
           <div>
             <div class="history-date">${formatShortDate(dateKey)}</div>
             <div class="history-summary">
-              🍼 ${stats.sut}ml · 🍶 ${stats.mama}ml · 🤱 ${stats.emdi}dk · ${stats.emdiCount} kez · 💩 ${stats.kaka}
+              🍼 ${stats.sut}ml · 🍶 ${stats.mama}ml · 🤱 ${stats.emdi}dk · ${stats.emdiCount} kez · 😴 ${stats.uyku}dk · ${stats.uykuCount} kez · 💩 ${stats.kaka}
             </div>
           </div>
           <span class="history-arrow">›</span>
@@ -1078,9 +1107,11 @@
   function updateAmountVisibility() {
     const isKaka = selectedType === 'kaka';
     const isEmdi = selectedType === 'emdi';
+    const isUyku = selectedType === 'uyku';
     const isFeed = selectedType === 'sut' || selectedType === 'mama';
     if (els.feedPanel) els.feedPanel.hidden = !isFeed;
     if (els.emdiPanel) els.emdiPanel.hidden = !isEmdi;
+    if (els.uykuPanel) els.uykuPanel.hidden = !isUyku;
     if (els.bezPanel) els.bezPanel.hidden = !isKaka;
     if (isKaka) {
       els.amountInput.value = '';
@@ -1089,6 +1120,9 @@
       if (els.emdiInput) els.emdiInput.value = '';
       selectedEmdiPreset = null;
       document.querySelectorAll('.emdi-preset-btn').forEach(b => b.classList.remove('selected'));
+      if (els.uykuInput) els.uykuInput.value = '';
+      selectedUykuPreset = null;
+      document.querySelectorAll('.uyku-preset-btn').forEach(b => b.classList.remove('selected'));
       setTimeout(function () {
         if (els.noteInput) els.noteInput.focus();
       }, 50);
@@ -1098,8 +1132,23 @@
       document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
       if (els.noteInput) els.noteInput.value = '';
       document.querySelectorAll('.note-preset-btn').forEach(b => b.classList.remove('selected'));
+      if (els.uykuInput) els.uykuInput.value = '';
+      selectedUykuPreset = null;
+      document.querySelectorAll('.uyku-preset-btn').forEach(b => b.classList.remove('selected'));
       setTimeout(function () {
         if (els.emdiInput) els.emdiInput.focus();
+      }, 50);
+    } else if (isUyku) {
+      els.amountInput.value = '';
+      selectedPreset = null;
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
+      if (els.noteInput) els.noteInput.value = '';
+      document.querySelectorAll('.note-preset-btn').forEach(b => b.classList.remove('selected'));
+      if (els.emdiInput) els.emdiInput.value = '';
+      selectedEmdiPreset = null;
+      document.querySelectorAll('.emdi-preset-btn').forEach(b => b.classList.remove('selected'));
+      setTimeout(function () {
+        if (els.uykuInput) els.uykuInput.focus();
       }, 50);
     } else {
       if (els.noteInput) els.noteInput.value = '';
@@ -1107,6 +1156,9 @@
       if (els.emdiInput) els.emdiInput.value = '';
       selectedEmdiPreset = null;
       document.querySelectorAll('.emdi-preset-btn').forEach(b => b.classList.remove('selected'));
+      if (els.uykuInput) els.uykuInput.value = '';
+      selectedUykuPreset = null;
+      document.querySelectorAll('.uyku-preset-btn').forEach(b => b.classList.remove('selected'));
     }
   }
 
@@ -1137,6 +1189,12 @@
       amount = parseInt(els.emdiInput.value, 10);
       if (!amount || amount <= 0) {
         showToast('Lütfen süre girin (dk) 🤱');
+        return;
+      }
+    } else if (selectedType === 'uyku') {
+      amount = parseInt(els.uykuInput.value, 10);
+      if (!amount || amount <= 0) {
+        showToast('Lütfen süre girin (dk) 😴');
         return;
       }
     } else if (selectedType !== 'kaka') {
@@ -1170,11 +1228,14 @@
 
     els.amountInput.value = '';
     if (els.emdiInput) els.emdiInput.value = '';
+    if (els.uykuInput) els.uykuInput.value = '';
     if (els.noteInput) els.noteInput.value = '';
     selectedPreset = null;
     selectedEmdiPreset = null;
+    selectedUykuPreset = null;
     document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
     document.querySelectorAll('.emdi-preset-btn').forEach(b => b.classList.remove('selected'));
+    document.querySelectorAll('.uyku-preset-btn').forEach(b => b.classList.remove('selected'));
     document.querySelectorAll('.note-preset-btn').forEach(b => b.classList.remove('selected'));
     setCurrentTime();
 
@@ -1183,6 +1244,7 @@
     let noteMsg = '';
     if (selectedType === 'kaka' && entry.note) noteMsg = ' · ' + entry.note;
     else if (selectedType === 'emdi') noteMsg = ' · ' + amount + ' dk';
+    else if (selectedType === 'uyku') noteMsg = ' · ' + amount + ' dk';
     showToast(`${cfg.emoji} ${cfg.label} kaydedildi${noteMsg}!`);
     renderHeader();
     renderStats();
@@ -1210,9 +1272,11 @@
   function updateEditPanelsVisibility() {
     const isKaka = editSelectedType === 'kaka';
     const isEmdi = editSelectedType === 'emdi';
+    const isUyku = editSelectedType === 'uyku';
     const isFeed = editSelectedType === 'sut' || editSelectedType === 'mama';
     if (els.editFeedPanel) els.editFeedPanel.hidden = !isFeed;
     if (els.editEmdiPanel) els.editEmdiPanel.hidden = !isEmdi;
+    if (els.editUykuPanel) els.editUykuPanel.hidden = !isUyku;
     if (els.editBezPanel) els.editBezPanel.hidden = !isKaka;
   }
 
@@ -1237,12 +1301,15 @@
 
     if (els.editAmountInput) els.editAmountInput.value = '';
     if (els.editEmdiInput) els.editEmdiInput.value = '';
+    if (els.editUykuInput) els.editUykuInput.value = '';
     if (els.editNoteInput) els.editNoteInput.value = '';
 
     if (entry.type === 'kaka') {
       if (els.editNoteInput) els.editNoteInput.value = entry.note || '';
     } else if (entry.type === 'emdi') {
       if (els.editEmdiInput) els.editEmdiInput.value = entry.amount || '';
+    } else if (entry.type === 'uyku') {
+      if (els.editUykuInput) els.editUykuInput.value = entry.amount || '';
     } else if (els.editAmountInput) {
       els.editAmountInput.value = entry.amount || '';
     }
@@ -1279,6 +1346,12 @@
       amount = parseInt(els.editEmdiInput.value, 10);
       if (!amount || amount <= 0) {
         showToast('Lütfen süre girin (dk) 🤱');
+        return;
+      }
+    } else if (editSelectedType === 'uyku') {
+      amount = parseInt(els.editUykuInput.value, 10);
+      if (!amount || amount <= 0) {
+        showToast('Lütfen süre girin (dk) 😴');
         return;
       }
     } else if (editSelectedType !== 'kaka') {
@@ -1346,6 +1419,7 @@
     report += `  🍶 Mama:   ${stats.mama} ml\n`;
     report += `  💧 Toplam: ${stats.total} ml\n`;
     report += `  🤱 Emzirme: ${stats.emdi} dk · ${stats.emdiCount} kez\n`;
+    report += `  😴 Uyku: ${stats.uyku} dk · ${stats.uykuCount} kez\n`;
     report += `  🍽️ Beslenme: ${stats.feedCount} kez\n`;
     report += `  💩 Kaka:   ${stats.kaka} kez\n\n`;
 
@@ -1360,6 +1434,10 @@
           const dur = e.amount ? `${e.amount} dk` : '';
           const note = e.note ? ` (${e.note})` : '';
           report += `  ${time}  ${cfg.emoji} Emzirme${dur ? ' - ' + dur : ''}${note}\n`;
+        } else if (e.type === 'uyku') {
+          const dur = e.amount ? `${e.amount} dk` : '';
+          const note = e.note ? ` (${e.note})` : '';
+          report += `  ${time}  ${cfg.emoji} Uyku${dur ? ' - ' + dur : ''}${note}\n`;
         } else {
           const note = e.note ? ` (${e.note})` : '';
           report += `  ${time}  ${cfg.emoji} ${cfg.label} - ${e.amount} ml${note}\n`;
@@ -1394,7 +1472,8 @@
         mama: stats.mama,
         total: stats.total,
         kaka: stats.kaka,
-        emdi: stats.emdi
+        emdi: stats.emdi,
+        uyku: stats.uyku
       });
     }
     return days;
@@ -1534,18 +1613,20 @@
 
     days.slice().reverse().forEach(function (d) {
       report += formatDate(d.dateKey) + '\n';
-      report += '  🍼 Süt: ' + d.sut + ' ml  🍶 Mama: ' + d.mama + ' ml  💧 Toplam: ' + d.total + ' ml  🤱 Emzirme: ' + (d.emdi || 0) + ' dk  💩 ' + d.kaka + ' bez\n\n';
+      report += '  🍼 Süt: ' + d.sut + ' ml  🍶 Mama: ' + d.mama + ' ml  💧 Toplam: ' + d.total + ' ml  🤱 Emzirme: ' + (d.emdi || 0) + ' dk  😴 Uyku: ' + (d.uyku || 0) + ' dk  💩 ' + d.kaka + ' bez\n\n';
     });
 
     const sumSut = days.reduce(function (s, d) { return s + d.sut; }, 0);
     const sumMama = days.reduce(function (s, d) { return s + d.mama; }, 0);
     const sumTotal = sumSut + sumMama;
     const sumEmdi = days.reduce(function (s, d) { return s + (d.emdi || 0); }, 0);
+    const sumUyku = days.reduce(function (s, d) { return s + (d.uyku || 0); }, 0);
     report += '📈 HAFTA TOPLAMI\n';
     report += '  🍼 Süt: ' + sumSut + ' ml\n';
     report += '  🍶 Mama: ' + sumMama + ' ml\n';
     report += '  💧 Toplam: ' + sumTotal + ' ml\n';
     report += '  🤱 Emzirme: ' + sumEmdi + ' dk\n';
+    report += '  😴 Uyku: ' + sumUyku + ' dk\n';
     report += '  📊 Günlük ortalama: ' + Math.round(sumTotal / 7) + ' ml\n';
     report += '\n' + '='.repeat(30) + '\nBebiş Takip 👶';
     return report;
@@ -1668,6 +1749,23 @@
     els.emdiInput.addEventListener('input', () => {
       selectedEmdiPreset = null;
       document.querySelectorAll('.emdi-preset-btn').forEach(b => b.classList.remove('selected'));
+    });
+  }
+
+  document.querySelectorAll('.uyku-preset-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.querySelectorAll('.uyku-preset-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedUykuPreset = parseInt(btn.dataset.dk, 10);
+      if (els.uykuInput) els.uykuInput.value = selectedUykuPreset;
+    });
+  });
+
+  if (els.uykuInput) {
+    els.uykuInput.addEventListener('input', () => {
+      selectedUykuPreset = null;
+      document.querySelectorAll('.uyku-preset-btn').forEach(b => b.classList.remove('selected'));
     });
   }
 

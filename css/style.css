@@ -247,6 +247,7 @@ body {
 .stat-formula { background: linear-gradient(135deg, #d6ebf7, #b8e0f5); }
 .stat-total { background: linear-gradient(135deg, #fff9e6, #ffeaa7); }
 .stat-emdi { background: linear-gradient(135deg, #e3f2fd, #bbdefb); }
+.stat-uyku { background: linear-gradient(135deg, #ede7f6, #d1c4e9); }
 .stat-poop { background: linear-gradient(135deg, #f0f9e8, #b8e994); }
 
 .stat-emoji {
@@ -292,12 +293,12 @@ body {
 .type-tab {
   flex: 1;
   min-width: 0;
-  padding: 0.75rem 0.35rem;
+  padding: 0.75rem 0.25rem;
   border: 2px solid var(--purple);
   border-radius: var(--radius-sm);
   background: var(--white);
   font-family: inherit;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
@@ -330,7 +331,8 @@ body {
 }
 
 .preset-btn,
-.emdi-preset-btn {
+.emdi-preset-btn,
+.uyku-preset-btn {
   padding: 0.5rem 0.85rem;
   border: 2px solid var(--blue);
   border-radius: 999px;
@@ -345,7 +347,9 @@ body {
 .preset-btn.selected,
 .preset-btn:active,
 .emdi-preset-btn.selected,
-.emdi-preset-btn:active {
+.emdi-preset-btn:active,
+.uyku-preset-btn.selected,
+.uyku-preset-btn:active {
   background: var(--blue);
   color: var(--white);
   border-color: var(--blue-dark);
@@ -662,6 +666,7 @@ body {
 .timeline-item.sut { border-left: 4px solid var(--blue-dark); }
 .timeline-item.mama { border-left: 4px solid var(--blue-dark); }
 .timeline-item.kaka { border-left: 4px solid var(--green); }
+.timeline-item.uyku { border-left: 4px solid #9575cd; }
 
 .timeline-emoji {
   font-size: 1.5rem;

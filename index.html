@@ -61,6 +61,12 @@
               <span class="stat-label">dk Emzirme</span>
               <span class="stat-sublabel" id="statEmdiCount">0 kez</span>
             </div>
+            <div class="stat-item stat-uyku">
+              <span class="stat-emoji">😴</span>
+              <span class="stat-value" id="statUyku">0</span>
+              <span class="stat-label">dk Uyku</span>
+              <span class="stat-sublabel" id="statUykuCount">0 kez</span>
+            </div>
             <div class="stat-item stat-poop">
               <span class="stat-emoji">💩</span>
               <span class="stat-value" id="statKaka">0</span>
@@ -92,6 +98,7 @@
             <button type="button" class="type-tab active" data-type="sut">🍼 Süt</button>
             <button type="button" class="type-tab" data-type="mama">🍶 Mama</button>
             <button type="button" class="type-tab" data-type="emdi">🤱 Emzirme</button>
+            <button type="button" class="type-tab" data-type="uyku">😴 Uyku</button>
             <button type="button" class="type-tab" data-type="kaka">💩 Bez</button>
           </div>
 
@@ -119,6 +126,18 @@
               <button type="button" class="emdi-preset-btn" data-dk="30">30</button>
             </div>
             <input type="number" id="emdiInput" class="input" placeholder="veya süre gir..." min="1" max="180" inputmode="numeric">
+          </div>
+
+          <div class="uyku-panel" id="uykuPanel" hidden>
+            <label class="field-label">Süre (dk)</label>
+            <div class="amount-presets">
+              <button type="button" class="uyku-preset-btn" data-dk="30">30</button>
+              <button type="button" class="uyku-preset-btn" data-dk="60">60</button>
+              <button type="button" class="uyku-preset-btn" data-dk="90">90</button>
+              <button type="button" class="uyku-preset-btn" data-dk="120">120</button>
+              <button type="button" class="uyku-preset-btn" data-dk="180">180</button>
+            </div>
+            <input type="number" id="uykuInput" class="input" placeholder="veya süre gir..." min="1" max="480" inputmode="numeric">
           </div>
 
           <div class="bez-panel" id="bezPanel" hidden>
@@ -237,6 +256,7 @@
           <button type="button" class="edit-type-tab active" data-type="sut">🍼 Süt</button>
           <button type="button" class="edit-type-tab" data-type="mama">🍶 Mama</button>
           <button type="button" class="edit-type-tab" data-type="emdi">🤱 Emzirme</button>
+          <button type="button" class="edit-type-tab" data-type="uyku">😴 Uyku</button>
           <button type="button" class="edit-type-tab" data-type="kaka">💩 Bez</button>
         </div>
 
@@ -248,6 +268,11 @@
         <div class="emdi-panel" id="editEmdiPanel" hidden>
           <label class="field-label">Süre (dk)</label>
           <input type="number" id="editEmdiInput" class="input" placeholder="süre gir..." min="1" max="180" inputmode="numeric">
+        </div>
+
+        <div class="uyku-panel" id="editUykuPanel" hidden>
+          <label class="field-label">Süre (dk)</label>
+          <input type="number" id="editUykuInput" class="input" placeholder="süre gir..." min="1" max="480" inputmode="numeric">
         </div>
 
         <div class="bez-panel" id="editBezPanel" hidden>
@@ -315,6 +340,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script src="js/firebase-sync.js?v=16"></script>
   <script src="js/seed-data.js?v=15"></script>
-  <script src="js/app.js?v=25"></script>
+  <script src="js/app.js?v=26"></script>
 </body>
 </html>
