@@ -8,6 +8,8 @@
     groqApiKey: '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'
   };
   const FIXED_BIRTH_DATE = DEFAULT_SETTINGS.birthDate;
+  const FIXED_BIRTH_WEIGHT_G = 3225;
+  const FIXED_BIRTH_HEIGHT_CM = 54;
   const FIXED_GROQ_KEY = DEFAULT_SETTINGS.groqApiKey;
   const GROQ_MODELS = [
     'llama-3.3-70b-versatile',
@@ -81,6 +83,8 @@
     settingsModal: document.getElementById('settingsModal'),
     closeSettings: document.getElementById('closeSettings'),
     babyNameInput: document.getElementById('babyNameInput'),
+    currentWeightInput: document.getElementById('currentWeightInput'),
+    currentHeightInput: document.getElementById('currentHeightInput'),
     saveSettings: document.getElementById('saveSettings'),
     reportModal: document.getElementById('reportModal'),
     closeReport: document.getElementById('closeReport'),
@@ -130,15 +134,110 @@
     return {
       babyName: synced.babyName || DEFAULT_SETTINGS.babyName,
       birthDate: FIXED_BIRTH_DATE,
+      birthWeightG: FIXED_BIRTH_WEIGHT_G,
+      birthHeightCm: FIXED_BIRTH_HEIGHT_CM,
+      currentWeightG: synced.currentWeightG || null,
+      currentHeightCm: synced.currentHeightCm || null,
       groqApiKey: FIXED_GROQ_KEY
     };
   }
 
+  function parseWeightKgInput(value) {
+    const kg = parseFloat(String(value).replace(',', '.'));
+    if (!Number.isFinite(kg) || kg <= 0) return null;
+    return Math.round(kg * 1000);
+  }
+
+  function formatWeightKgInput(grams) {
+    if (!grams) return '';
+    return (grams / 1000).toFixed(2);
+  }
+
+  function parseHeightCmInput(value) {
+    const cm = parseInt(value, 10);
+    if (!Number.isFinite(cm) || cm <= 0) return null;
+    return cm;
+  }
+
+  function formatGrowthContext(settings) {
+    const birthText = 'Doğum (14 Mayıs 2026): ' + settings.birthWeightG + ' gr, ' + settings.birthHeightCm + ' cm';
+    if (!settings.currentWeightG && !settings.currentHeightCm) {
+      return birthText + '. Güncel boy/kilo girilmemiş.';
+    }
+
+    const parts = [];
+    if (settings.currentWeightG) {
+      parts.push(settings.currentWeightG + ' gr (' + formatWeightKgInput(settings.currentWeightG) + ' kg)');
+    }
+    if (settings.currentHeightCm) {
+      parts.push(settings.currentHeightCm + ' cm');
+    }
+
+    let changeText = '';
+    if (settings.currentWeightG) {
+      const weightGain = settings.currentWeightG - settings.birthWeightG;
+      changeText += ' Kilo değişimi: ' + (weightGain >= 0 ? '+' : '') + weightGain + ' gr.';
+    }
+    if (settings.currentHeightCm) {
+      const heightGain = settings.currentHeightCm - settings.birthHeightCm;
+      changeText += ' Boy değişimi: ' + (heightGain >= 0 ? '+' : '') + heightGain + ' cm.';
+    }
+
+    return birthText + '. Güncel: ' + parts.join(', ') + '.' + changeText;
+  }
+
+  function buildGrowthAdvice(settings, age) {
+    if (!settings.currentWeightG && !settings.currentHeightCm) {
+      return 'Güncel boy ve kilo girildiğinde büyüme de beslenme değerlendirmesine dahil edilir.';
+    }
+
+    let text = '';
+    if (settings.currentWeightG) {
+      const gain = settings.currentWeightG - settings.birthWeightG;
+      text += 'Güncel kilo ' + formatWeightKgInput(settings.currentWeightG) + ' kg';
+      text += ' (doğumdan bu yana ' + (gain >= 0 ? '+' : '') + gain + ' gr).';
+    }
+    if (settings.currentHeightCm) {
+      const gainCm = settings.currentHeightCm - settings.birthHeightCm;
+      text += ' Güncel boy ' + settings.currentHeightCm + ' cm';
+      text += ' (doğumdan bu yana ' + (gainCm >= 0 ? '+' : '') + gainCm + ' cm).';
+    }
+    text += ' ' + age.weeks + ' haftalık bebek için büyüme ve beslenme birlikte izlenmeli.';
+    return text.trim();
+  }
+
   function saveSettingsData(settings) {
-    if (!window.FirestoreSync || !window.FirestoreSync.isReady()) return;
-    window.FirestoreSync.saveSettings(settings).catch(function () {
-      showToast('Ayarlar kaydedilemedi ☁️');
-    });
+    if (window.FirestoreSync && window.FirestoreSync.isReady()) {
+      window.FirestoreSync.saveSettings(settings).catch(function () {
+        showToast('Ayarlar kaydedilemedi ☁️');
+      });
+      return true;
+    }
+    return false;
+  }
+
+  function openModal(modal) {
+    if (!modal) return;
+    modal.hidden = false;
+    modal.removeAttribute('hidden');
+  }
+
+  function closeModal(modal) {
+    if (!modal) return;
+    modal.hidden = true;
+    modal.setAttribute('hidden', '');
+  }
+
+  function bindClick(el, handler) {
+    if (el) el.addEventListener('click', handler);
+  }
+
+  function openSettingsModal() {
+    const settings = loadSettings();
+    if (els.babyNameInput) els.babyNameInput.value = settings.babyName || '';
+    if (els.currentWeightInput) els.currentWeightInput.value = formatWeightKgInput(settings.currentWeightG);
+    if (els.currentHeightInput) els.currentHeightInput.value = settings.currentHeightCm || '';
+    openModal(els.settingsModal);
   }
 
   function formatEntryDetail(entry) {
@@ -354,24 +453,55 @@
 
     const recent3 = recordedDays.slice(-3);
     const prev3 = recordedDays.slice(-6, -3);
-    const avgRecent3 = recent3.length
-      ? Math.round(recent3.reduce(function (s, d) { return s + d.total; }, 0) / recent3.length)
-      : 0;
-    const avgPrev3 = prev3.length
-      ? Math.round(prev3.reduce(function (s, d) { return s + d.total; }, 0) / prev3.length)
-      : 0;
+    const periodAvg = function (days, key) {
+      return days.length
+        ? Math.round(days.reduce(function (s, d) { return s + (d[key] || 0); }, 0) / days.length)
+        : 0;
+    };
+    const avgRecent3 = periodAvg(recent3, 'total');
+    const avgPrev3 = periodAvg(prev3, 'total');
+    const avgRecent3Emdi = periodAvg(recent3, 'emdi');
+    const avgPrev3Emdi = periodAvg(prev3, 'emdi');
 
-    let trend = 'Yeterli geçmiş kayıt yok.';
-    if (recent3.length && prev3.length) {
-      if (avgRecent3 > avgPrev3 * 1.1) trend = 'Son günlerde beslenme miktarı artış eğiliminde.';
-      else if (avgRecent3 < avgPrev3 * 0.9) trend = 'Son günlerde beslenme miktarı azalış eğiliminde.';
-      else trend = 'Son günlerde beslenme miktarı genel olarak stabil.';
-    } else if (recent3.length >= 2) {
-      const first = recent3[0].total;
-      const last = recent3[recent3.length - 1].total;
-      if (last > first * 1.15) trend = 'Kısa dönemde beslenme artış eğiliminde.';
-      else if (last < first * 0.85) trend = 'Kısa dönemde beslenme azalış eğiliminde.';
-      else trend = 'Kısa dönemde beslenme stabil görünüyor.';
+    function getTrendDirection(recentAvg, prevAvg, shortDays, key) {
+      if (prevAvg > 0 && recentAvg > 0) {
+        if (recentAvg > prevAvg * 1.1) return 'up';
+        if (recentAvg < prevAvg * 0.9) return 'down';
+        return 'stable';
+      }
+      if (shortDays.length >= 2) {
+        const first = shortDays[0][key] || 0;
+        const last = shortDays[shortDays.length - 1][key] || 0;
+        if (last > first * 1.15) return 'up';
+        if (last < first * 0.85) return 'down';
+      }
+      return 'stable';
+    }
+
+    const mlTrendDir = getTrendDirection(avgRecent3, avgPrev3, recent3, 'total');
+    const emdiTrendDir = getTrendDirection(avgRecent3Emdi, avgPrev3Emdi, recent3, 'emdi');
+
+    let mlTrend = 'Süt/mama (ml) için yeterli geçmiş kayıt yok.';
+    if (mlTrendDir === 'up') mlTrend = 'Süt/mama (ml) artış eğiliminde.';
+    else if (mlTrendDir === 'down') mlTrend = 'Süt/mama (ml) azalış eğiliminde.';
+    else if (recent3.length) mlTrend = 'Süt/mama (ml) genel olarak stabil.';
+
+    let emdiTrend = 'Emzirme için yeterli geçmiş kayıt yok.';
+    if (emdiTrendDir === 'up') emdiTrend = 'Emzirme süresi (dk) artış eğiliminde.';
+    else if (emdiTrendDir === 'down') emdiTrend = 'Emzirme süresi (dk) azalış eğiliminde.';
+    else if (recent3.length) emdiTrend = 'Emzirme süresi (dk) genel olarak stabil.';
+
+    let trend;
+    if (mlTrendDir === 'down' && emdiTrendDir === 'up') {
+      trend = 'Süt/mama (ml) azalırken emzirme süresi artıyor — beslenme büyük ölçüde emzirmeye kaymış olabilir, bu tek başına olumsuz değerlendirilmemeli.';
+    } else if (mlTrendDir === 'up' && emdiTrendDir === 'down') {
+      trend = 'Süt/mama (ml) artarken emzirme süresi azalıyor — takviye mama oranı artmış olabilir.';
+    } else if (mlTrendDir === 'down' && emdiTrendDir === 'down') {
+      trend = 'Hem süt/mama (ml) hem emzirme süresi azalış eğiliminde — genel beslenmeyi birlikte izleyin.';
+    } else if (mlTrendDir === 'up' && emdiTrendDir === 'up') {
+      trend = 'Hem süt/mama (ml) hem emzirme süresi artış eğiliminde.';
+    } else {
+      trend = mlTrend + ' ' + emdiTrend;
     }
 
     return {
@@ -385,8 +515,12 @@
       avgKaka: avg('kaka'),
       avgFeedCount: avg('feedCount'),
       trend: trend,
+      mlTrend: mlTrend,
+      emdiTrend: emdiTrend,
       avgRecent3: avgRecent3,
-      avgPrev3: avgPrev3
+      avgPrev3: avgPrev3,
+      avgRecent3Emdi: avgRecent3Emdi,
+      avgPrev3Emdi: avgPrev3Emdi
     };
   }
 
@@ -410,7 +544,7 @@
     const todayEntries = getEntriesForDate(data.entries, todayKey());
     const stats = calcStats(todayEntries);
     const history = getHistoricalOverview(7);
-    return AI_CACHE_PREFIX + todayKey() + '_h' + hour + '_' + stats.total + '_' + stats.kaka + '_' + todayEntries.length + '_a' + history.avgTotal + '_d' + history.recordedDays;
+    return AI_CACHE_PREFIX + todayKey() + '_h' + hour + '_' + stats.total + '_' + stats.kaka + '_' + todayEntries.length + '_a' + history.avgTotal + '_e' + history.avgEmdi + '_w' + (loadSettings().currentWeightG || 0) + '_hcm' + (loadSettings().currentHeightCm || 0) + '_d' + history.recordedDays;
   }
 
   function loadCachedAdvice() {
@@ -445,12 +579,17 @@
     }).join('\n');
 
     return name + ', ' + age.days + ' günlük bebek (' + age.weeks + ' hafta ' + age.remainDays + ' gün).\n\n' +
+      'BOY/KİLO: ' + formatGrowthContext(settings) + '\n\n' +
       'BUGÜN: süt ' + stats.sut + 'ml, mama ' + stats.mama + 'ml, toplam ' + stats.total + 'ml, ' + stats.feedCount + ' beslenme, ' + stats.emdi + 'dk emzirme (' + stats.emdiCount + ' kez), ' + stats.kaka + ' bez.\n\n' +
       'SON 7 GÜN:\n' + dayLines + '\n\n' +
-      'GENEL ORTALAMALAR (' + history.recordedDays + ' kayıtlı gün): günlük ort. ' + history.avgTotal + 'ml (süt ' + history.avgSut + ', mama ' + history.avgMama + '), ort. ' + history.avgFeedCount + ' beslenme, ort. ' + history.avgEmdi + 'dk emzirme, ort. ' + history.avgKaka + ' bez.\n' +
-      'TREND: ' + history.trend + '\n\n' +
-      'Değerlendirmeyi yalnızca bugüne göre değil; son 7 günün geçmişi, ortalamalar ve genel eğilim üzerinden yap. Bugünü bu bağlamda yorumla.\n' +
-      'Türkçe, sıcak, max 200 kelime. Başlıklar: 📊 Genel Değerlendirme, 📅 Bugün, 💡 Tavsiye, 💩 Bez, 🌈 Moral. Teşhis koyma, endişede doktora yönlendir.';
+      'GENEL ORTALAMALAR (' + history.recordedDays + ' kayıtlı gün): günlük ort. ' + history.avgTotal + 'ml (süt ' + history.avgSut + ', mama ' + history.avgMama + '), ort. ' + history.avgFeedCount + ' beslenme, ort. ' + history.avgEmdi + 'dk emzirme (' + history.avgEmdiCount + ' kez), ort. ' + history.avgKaka + ' bez.\n' +
+      'ML TREND: ' + history.mlTrend + ' (son 3 gün ort. ' + history.avgRecent3 + 'ml, önceki 3 gün ort. ' + history.avgPrev3 + 'ml)\n' +
+      'EMZİRME TREND: ' + history.emdiTrend + ' (son 3 gün ort. ' + history.avgRecent3Emdi + 'dk, önceki 3 gün ort. ' + history.avgPrev3Emdi + 'dk)\n' +
+      'BİRLEŞİK YORUM: ' + history.trend + '\n\n' +
+      'ÖNEMLİ: Değerlendirmeyi yalnızca süt/mama ml miktarına göre yapma. Emzirme dakikaları da beslenmenin ayrılmaz parçasıdır. ml azalıp emzirme artıyorsa bunu "beslenme azalıyor" diye tek başına söyleme; emzirme artışını mutlaka belirt ve ml+emzirme dengesini birlikte yorumla.\n' +
+      'Boy/kilo gelişimini (doğum: 3225 gr / 54 cm ve güncel değerler) beslenme değerlendirmesinde mutlaka dikkate al.\n' +
+      'Değerlendirmeyi son 7 günün geçmişi, ortalamalar ve genel eğilim üzerinden yap. Bugünü bu bağlamda yorumla.\n' +
+      'Türkçe, sıcak, max 200 kelime. Başlıklar: 📊 Genel Değerlendirme, 📅 Bugün, 📏 Büyüme, 💡 Tavsiye, 💩 Bez, 🌈 Moral. Teşhis koyma, endişede doktora yönlendir.';
   }
 
   function buildLocalAdvice(settings, age) {
@@ -482,7 +621,10 @@
     } else {
       let rangeText;
       if (history.avgTotal < minMl) {
-        rangeText = 'Son ' + history.recordedDays + ' günde günlük ortalama ' + history.avgTotal + ' ml — yaşı için beklenen aralığın (' + minMl + '-' + maxMl + ' ml) altında.';
+        rangeText = 'Son ' + history.recordedDays + ' günde günlük ortalama ' + history.avgTotal + ' ml (süt/mama) — yaşı için beklenen aralığın (' + minMl + '-' + maxMl + ' ml) altında.';
+        if (history.avgEmdi >= 20) {
+          rangeText += ' Ancak ortalama ' + history.avgEmdi + ' dk/gün emzirme kayıtlı; ml düşük görünse de beslenmenin önemli kısmı emzirmeden geliyor olabilir.';
+        }
       } else if (history.avgTotal > maxMl) {
         rangeText = 'Son ' + history.recordedDays + ' günde günlük ortalama ' + history.avgTotal + ' ml — üst sınıra yakın veya üzerinde.';
       } else {
@@ -535,11 +677,14 @@
 
     const recentDaysText = history.days
       .filter(function (d) { return d.hasData; })
-      .map(function (d) { return d.label + ' ' + d.total + 'ml'; })
+      .map(function (d) { return d.label + ' ' + d.total + 'ml + ' + d.emdi + 'dk emzirme'; })
       .join(', ');
+
+    const growthText = buildGrowthAdvice(settings, age);
 
     return '📊 GENEL DEĞERLENDİRME (Son 7 gün)\n' + generalText +
       (recentDaysText ? '\nGünlük toplamlar: ' + recentDaysText + '.' : '') +
+      '\n\n📏 BÜYÜME\n' + growthText +
       '\n\n📅 BUGÜN\n' + todayText +
       '\n\n💡 TAVSİYE\n' + name + ' şu an ' + age.weeks + ' hafta ' + age.remainDays + ' günlük. ' +
       'Beslenmeler arası 2-3 saat genelde uygundur. Geçmiş kayıtlara göre düzenli takip yapıyorsunuz; emzirme ve mama dengesini bu genel eğilime göre gözlemleyin.\n\n' +
@@ -576,7 +721,7 @@
             messages: [
               {
                 role: 'system',
-                content: 'Sen deneyimli bir yenidoğan beslenme danışmanısın. Türkçe, sıcak ve anlaşılır yaz. Teşhis koyma.'
+                content: 'Sen deneyimli bir yenidoğan beslenme danışmanısın. Türkçe, sıcak ve anlaşılır yaz. Teşhis koyma. Değerlendirmede süt/mama ml miktarı ile emzirme dakikalarını birlikte ele al; ml azalıp emzirme artıyorsa bunu beslenme kaybı olarak yorumlama. Bebeğin doğum ve güncel boy/kilo gelişimini de beslenme yorumuna dahil et.'
               },
               { role: 'user', content: prompt }
             ],
@@ -1460,8 +1605,8 @@
     });
   }
 
-  els.addBtn.addEventListener('click', addEntry);
-  els.weeklyReportBtn.addEventListener('click', showWeeklyReport);
+  bindClick(els.addBtn, addEntry);
+  bindClick(els.weeklyReportBtn, showWeeklyReport);
 
   document.querySelectorAll('.edit-type-tab').forEach(function (tab) {
     tab.addEventListener('click', function () {
@@ -1479,27 +1624,37 @@
     if (e.target === els.editModal) closeEditModal();
   });
 
-  els.closeWeeklyReport.addEventListener('click', () => { els.weeklyReportModal.hidden = true; });
-  els.weeklyReportModal.addEventListener('click', e => {
-    if (e.target === els.weeklyReportModal) els.weeklyReportModal.hidden = true;
-  });
-  els.copyWeeklyReport.addEventListener('click', copyWeeklyReport);
-  els.shareWeeklyReport.addEventListener('click', shareWeeklyReport);
+  bindClick(els.closeWeeklyReport, function () { closeModal(els.weeklyReportModal); });
+  if (els.weeklyReportModal) {
+    els.weeklyReportModal.addEventListener('click', function (e) {
+      if (e.target === els.weeklyReportModal) closeModal(els.weeklyReportModal);
+    });
+  }
+  bindClick(els.copyWeeklyReport, copyWeeklyReport);
+  bindClick(els.shareWeeklyReport, shareWeeklyReport);
 
-  els.settingsBtn.addEventListener('click', () => {
-    const settings = loadSettings();
-    els.babyNameInput.value = settings.babyName || '';
-    els.settingsModal.hidden = false;
-  });
+  bindClick(els.settingsBtn, openSettingsModal);
 
-  els.closeSettings.addEventListener('click', () => { els.settingsModal.hidden = true; });
-  els.settingsModal.addEventListener('click', e => {
-    if (e.target === els.settingsModal) els.settingsModal.hidden = true;
-  });
+  bindClick(els.closeSettings, function () { closeModal(els.settingsModal); });
+  if (els.settingsModal) {
+    els.settingsModal.addEventListener('click', function (e) {
+      if (e.target === els.settingsModal) closeModal(els.settingsModal);
+    });
+  }
 
-  els.saveSettings.addEventListener('click', () => {
-    saveSettingsData({ babyName: els.babyNameInput.value.trim() });
-    els.settingsModal.hidden = true;
+  bindClick(els.saveSettings, function () {
+    const babyName = els.babyNameInput ? els.babyNameInput.value.trim() : '';
+    const currentWeightG = els.currentWeightInput ? parseWeightKgInput(els.currentWeightInput.value) : null;
+    const currentHeightCm = els.currentHeightInput ? parseHeightCmInput(els.currentHeightInput.value) : null;
+    if (!saveSettingsData({
+      babyName: babyName,
+      currentWeightG: currentWeightG,
+      currentHeightCm: currentHeightCm
+    })) {
+      showToast('Ayarlar kaydedilemedi ☁️');
+      return;
+    }
+    closeModal(els.settingsModal);
     showToast('Ayarlar kaydedildi! ⚙️');
     renderHeader();
     renderBabyAge();

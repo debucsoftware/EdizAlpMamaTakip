@@ -26,7 +26,11 @@
   const state = {
     entries: [],
     deletedIds: [],
-    settings: { babyName: DEFAULT_BABY_NAME }
+    settings: {
+      babyName: DEFAULT_BABY_NAME,
+      currentWeightG: null,
+      currentHeightCm: null
+    }
   };
 
   function getSeedEntries() {
@@ -97,7 +101,11 @@
     return {
       entries: state.entries,
       deletedIds: state.deletedIds,
-      settings: { babyName: state.settings.babyName || DEFAULT_BABY_NAME },
+      settings: {
+        babyName: state.settings.babyName || DEFAULT_BABY_NAME,
+        currentWeightG: state.settings.currentWeightG || null,
+        currentHeightCm: state.settings.currentHeightCm || null
+      },
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
   }
@@ -109,17 +117,31 @@
 
     const prevEntriesSig = entriesSignature(state.entries);
     const prevDeletedSig = deletedSignature(state.deletedIds);
-    const prevSettings = state.settings.babyName || DEFAULT_BABY_NAME;
+    const prevSettingsSig = JSON.stringify({
+      babyName: state.settings.babyName || DEFAULT_BABY_NAME,
+      currentWeightG: state.settings.currentWeightG || null,
+      currentHeightCm: state.settings.currentHeightCm || null
+    });
 
     mergeRemoteIntoState(remoteEntries, remoteDeleted);
 
     if (remoteSettings.babyName) {
       state.settings.babyName = remoteSettings.babyName;
     }
+    if ('currentWeightG' in remoteSettings) {
+      state.settings.currentWeightG = remoteSettings.currentWeightG || null;
+    }
+    if ('currentHeightCm' in remoteSettings) {
+      state.settings.currentHeightCm = remoteSettings.currentHeightCm || null;
+    }
 
     const entriesChanged = prevEntriesSig !== entriesSignature(state.entries);
     const deletedChanged = prevDeletedSig !== deletedSignature(state.deletedIds);
-    const settingsChanged = (state.settings.babyName || DEFAULT_BABY_NAME) !== prevSettings;
+    const settingsChanged = JSON.stringify({
+      babyName: state.settings.babyName || DEFAULT_BABY_NAME,
+      currentWeightG: state.settings.currentWeightG || null,
+      currentHeightCm: state.settings.currentHeightCm || null
+    }) !== prevSettingsSig;
 
     return entriesChanged || deletedChanged || settingsChanged;
   }
@@ -133,6 +155,8 @@
       state.entries = filterDeleted(remote.entries || [], remote.deletedIds || []);
       state.deletedIds = uniqueIds(remote.deletedIds || []);
       state.settings.babyName = (remote.settings && remote.settings.babyName) || DEFAULT_BABY_NAME;
+      state.settings.currentWeightG = remote.settings && remote.settings.currentWeightG ? remote.settings.currentWeightG : null;
+      state.settings.currentHeightCm = remote.settings && remote.settings.currentHeightCm ? remote.settings.currentHeightCm : null;
       return { entryCount: state.entries.length, uploaded: false };
     }
 
@@ -141,6 +165,8 @@
     state.entries = seedEntries.slice();
     state.deletedIds = [];
     state.settings.babyName = (seedSettings && seedSettings.babyName) || DEFAULT_BABY_NAME;
+    state.settings.currentWeightG = null;
+    state.settings.currentHeightCm = null;
 
     ignoreNextSnapshot = true;
     ignoreSnapshotUntil = Date.now() + 1500;
@@ -200,7 +226,11 @@
   }
 
   function getSettings() {
-    return { babyName: state.settings.babyName || DEFAULT_BABY_NAME };
+    return {
+      babyName: state.settings.babyName || DEFAULT_BABY_NAME,
+      currentWeightG: state.settings.currentWeightG || null,
+      currentHeightCm: state.settings.currentHeightCm || null
+    };
   }
 
   function saveData(data) {
@@ -227,6 +257,12 @@
   function saveSettings(settings) {
     if (settings && settings.babyName) {
       state.settings.babyName = settings.babyName;
+    }
+    if (settings && 'currentWeightG' in settings) {
+      state.settings.currentWeightG = settings.currentWeightG || null;
+    }
+    if (settings && 'currentHeightCm' in settings) {
+      state.settings.currentHeightCm = settings.currentHeightCm || null;
     }
     return pushToFirestore();
   }

@@ -65,10 +65,13 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-bottom: 2px solid var(--pink);
   padding: 0.75rem 1rem;
+  isolation: isolate;
+  transform: translateZ(0);
 }
 
 .header-inner {
@@ -121,6 +124,10 @@ body {
   cursor: pointer;
   box-shadow: var(--shadow);
   transition: transform 0.2s;
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
+  flex-shrink: 0;
 }
 
 .btn-icon:active {
@@ -821,6 +828,12 @@ body {
   color: var(--text-light);
   margin-top: 0.75rem;
   font-weight: 600;
+}
+
+.birth-info {
+  background: #eef6fc;
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.75rem;
 }
 
 .report-entry-list {

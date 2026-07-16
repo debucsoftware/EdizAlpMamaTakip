@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="description" content="Bebek beslenme ve kaka takip uygulaması">
   <title>Bebiş Takip 👶</title>
-  <link rel="stylesheet" href="css/style.css?v=3">
+  <link rel="stylesheet" href="css/style.css?v=4">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -29,7 +29,7 @@
           <p class="subtitle" id="todayDate"></p>
         </div>
       </div>
-      <button class="btn-icon" id="settingsBtn" aria-label="Ayarlar">⚙️</button>
+      <button type="button" class="btn-icon" id="settingsBtn" aria-label="Ayarlar">⚙️</button>
     </div>
   </header>
 
@@ -201,9 +201,17 @@
         <button class="btn-close" id="closeSettings">&times;</button>
       </div>
       <div class="modal-body">
-        <label class="field-label">Bebeğin Adı</label>
+        <label class="field-label" for="babyNameInput">Bebeğin Adı</label>
         <input type="text" id="babyNameInput" class="input" placeholder="Örn: Ediz" maxlength="30">
-        <p class="hint">Beslenme kayıtları telefonunuzda saklanır. Doğum tarihi sabittir.</p>
+
+        <p class="hint birth-info">👶 Doğum: 14 Mayıs 2026 · 3225 gr · 54 cm</p>
+
+        <label class="field-label">Güncel Boy / Kilo</label>
+        <div class="datetime-row">
+          <input type="number" id="currentWeightInput" class="input" placeholder="Kilo (kg)" min="1" max="20" step="0.01" inputmode="decimal">
+          <input type="number" id="currentHeightInput" class="input" placeholder="Boy (cm)" min="40" max="120" step="1" inputmode="numeric">
+        </div>
+        <p class="hint">Güncel boy ve kilo değerlendirmeye dahil edilir. Doğum bilgisi sabittir.</p>
       </div>
       <div class="modal-footer">
         <button class="btn-primary" id="saveSettings">Kaydet</button>
@@ -299,8 +307,8 @@
 
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="js/firebase-sync.js?v=15"></script>
+  <script src="js/firebase-sync.js?v=16"></script>
   <script src="js/seed-data.js?v=15"></script>
-  <script src="js/app.js?v=21"></script>
+  <script src="js/app.js?v=23"></script>
 </body>
 </html>
