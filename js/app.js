@@ -70,7 +70,6 @@
     addBtn: document.getElementById('addBtn'),
     timelineList: document.getElementById('timelineList'),
     historyList: document.getElementById('historyList'),
-    reportBtn: document.getElementById('reportBtn'),
     weeklyReportBtn: document.getElementById('weeklyReportBtn'),
     weeklyReportModal: document.getElementById('weeklyReportModal'),
     closeWeeklyReport: document.getElementById('closeWeeklyReport'),
@@ -1240,18 +1239,21 @@
       });
     }
 
-    drawLine('sut', '#ff91a4', 2.5, false);
+    drawLine('sut', '#5ba4d9', 2.5, false);
     drawLine('mama', '#7ec8e3', 2.5, false);
     drawLine('total', '#f59e0b', 3, true);
 
-    // Emzirme süreleri (dk) - dikey çizgiler
+    // Emzirme süreleri (dk) - kesikli dikey çizgiler
     const yAtEmdi = function (val) {
       return pad.top + chartH * (1 - (val || 0) / emdiAxisMax);
     };
     ctx.strokeStyle = '#22c55e';
+    ctx.fillStyle = '#22c55e';
     ctx.lineWidth = 2;
+    ctx.setLineDash([5, 4]);
     ctx.globalAlpha = 0.65;
     days.forEach(function (day, i) {
+      if (!day.emdi) return;
       const x = xAt(i);
       const y = yAtEmdi(day.emdi);
       const yBase = pad.top + chartH;
@@ -1259,7 +1261,11 @@
       ctx.moveTo(x, yBase);
       ctx.lineTo(x, y);
       ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fill();
     });
+    ctx.setLineDash([]);
     ctx.globalAlpha = 1;
 
     days.forEach(function (day, i) {
@@ -1270,19 +1276,21 @@
     });
 
     const legends = [
-      { label: '🍼 Süt', color: '#ff91a4' },
+      { label: '🍼 Süt', color: '#5ba4d9' },
       { label: '🍶 Mama', color: '#7ec8e3' },
       { label: '💧 Toplam', color: '#f59e0b' },
-      { label: '🤱 Emzirme', color: '#22c55e' }
+      { label: '🤱 Emzirme', color: '#22c55e', dashed: true }
     ];
     let lx = pad.left;
     legends.forEach(function (leg) {
       ctx.strokeStyle = leg.color;
       ctx.lineWidth = 3;
+      ctx.setLineDash(leg.dashed ? [5, 4] : []);
       ctx.beginPath();
       ctx.moveTo(lx, 12);
       ctx.lineTo(lx + 14, 12);
       ctx.stroke();
+      ctx.setLineDash([]);
       ctx.fillStyle = '#333';
       ctx.font = '700 11px Nunito, sans-serif';
       ctx.textAlign = 'left';
@@ -1328,10 +1336,6 @@
     els.reportContent.textContent = generateReport(dateKey);
     renderReportEntries(dateKey);
     els.reportModal.hidden = false;
-  }
-
-  function showTodayReport() {
-    showReportForDate(todayKey());
   }
 
   async function copyReport() {
@@ -1457,7 +1461,6 @@
   }
 
   els.addBtn.addEventListener('click', addEntry);
-  els.reportBtn.addEventListener('click', showTodayReport);
   els.weeklyReportBtn.addEventListener('click', showWeeklyReport);
 
   document.querySelectorAll('.edit-type-tab').forEach(function (tab) {

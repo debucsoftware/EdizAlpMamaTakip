@@ -20,7 +20,7 @@ Bebeğin süt, mama, emzirme ve bez takibini kolayca yapmanızı sağlayan mobil
 - Bebeğin yaşına göre beslenme ve bez notları
 
 ### Raporlar
-- 📄 **Günlük rapor** — detaylı özet, kopyala / paylaş
+- 📄 Geçmiş günlerden günlük rapor görüntüleme (kopyala / paylaş)
 - 📊 **Haftalık rapor** — son 7 günün metin özeti ve grafiği
   - Sol eksen: **ml** (süt, mama, toplam çizgileri)
   - Sağ eksen: **dk** (emzirme süreleri, yeşil dikey çizgiler)
@@ -86,7 +86,7 @@ Telefondan siteyi açın → tarayıcı menüsünden **Ana Ekrana Ekle** seçene
 2. **Ekle** sekmesinden Süt / Mama / Emzirme / Bez seçin
 3. Miktar veya süreyi girin, tarih/saati ayarlayın → **Kaydet**
 4. **Özet** sekmesinde günlük tavsiyeyi okuyun
-5. **Bugün** sekmesinden **Rapor Al** veya **Haftalık Rapor** ile özet alın
+5. **Bugün** sekmesinden **Haftalık Rapor** ile özet alın
 6. **Geçmiş** sekmesinden önceki günleri inceleyin
 
 ## Notlar
