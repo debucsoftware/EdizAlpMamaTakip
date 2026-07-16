@@ -5,7 +5,7 @@
   const DEFAULT_SETTINGS = {
     babyName: 'Ediz',
     birthDate: '2026-05-14',
-    groqApiKey: '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'
+    groqApiKey: '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'
   };
   const FIXED_BIRTH_DATE = DEFAULT_SETTINGS.birthDate;
   const FIXED_GROQ_KEY = DEFAULT_SETTINGS.groqApiKey;
