@@ -5,7 +5,7 @@
   const DEFAULT_SETTINGS = {
     babyName: 'Ediz',
     birthDate: '2026-05-14',
-    groqApiKey: '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'
+    groqApiKey: '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'
   };
   const FIXED_BIRTH_DATE = DEFAULT_SETTINGS.birthDate;
   const FIXED_BIRTH_WEIGHT_G = 3225;
