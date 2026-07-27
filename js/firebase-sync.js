@@ -29,7 +29,8 @@
     settings: {
       babyName: DEFAULT_BABY_NAME,
       currentWeightG: null,
-      currentHeightCm: null
+      currentHeightCm: null,
+      groqApiKey: ''
     }
   };
 
@@ -104,7 +105,8 @@
       settings: {
         babyName: state.settings.babyName || DEFAULT_BABY_NAME,
         currentWeightG: state.settings.currentWeightG || null,
-        currentHeightCm: state.settings.currentHeightCm || null
+        currentHeightCm: state.settings.currentHeightCm || null,
+        groqApiKey: state.settings.groqApiKey || ''
       },
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
@@ -120,7 +122,8 @@
     const prevSettingsSig = JSON.stringify({
       babyName: state.settings.babyName || DEFAULT_BABY_NAME,
       currentWeightG: state.settings.currentWeightG || null,
-      currentHeightCm: state.settings.currentHeightCm || null
+      currentHeightCm: state.settings.currentHeightCm || null,
+      groqApiKey: state.settings.groqApiKey || ''
     });
 
     mergeRemoteIntoState(remoteEntries, remoteDeleted);
@@ -134,13 +137,17 @@
     if ('currentHeightCm' in remoteSettings) {
       state.settings.currentHeightCm = remoteSettings.currentHeightCm || null;
     }
+    if ('groqApiKey' in remoteSettings) {
+      state.settings.groqApiKey = remoteSettings.groqApiKey || '';
+    }
 
     const entriesChanged = prevEntriesSig !== entriesSignature(state.entries);
     const deletedChanged = prevDeletedSig !== deletedSignature(state.deletedIds);
     const settingsChanged = JSON.stringify({
       babyName: state.settings.babyName || DEFAULT_BABY_NAME,
       currentWeightG: state.settings.currentWeightG || null,
-      currentHeightCm: state.settings.currentHeightCm || null
+      currentHeightCm: state.settings.currentHeightCm || null,
+      groqApiKey: state.settings.groqApiKey || ''
     }) !== prevSettingsSig;
 
     return entriesChanged || deletedChanged || settingsChanged;
@@ -157,6 +164,7 @@
       state.settings.babyName = (remote.settings && remote.settings.babyName) || DEFAULT_BABY_NAME;
       state.settings.currentWeightG = remote.settings && remote.settings.currentWeightG ? remote.settings.currentWeightG : null;
       state.settings.currentHeightCm = remote.settings && remote.settings.currentHeightCm ? remote.settings.currentHeightCm : null;
+      state.settings.groqApiKey = remote.settings && remote.settings.groqApiKey ? remote.settings.groqApiKey : '';
       return { entryCount: state.entries.length, uploaded: false };
     }
 
@@ -167,6 +175,7 @@
     state.settings.babyName = (seedSettings && seedSettings.babyName) || DEFAULT_BABY_NAME;
     state.settings.currentWeightG = null;
     state.settings.currentHeightCm = null;
+    state.settings.groqApiKey = '';
 
     ignoreNextSnapshot = true;
     ignoreSnapshotUntil = Date.now() + 1500;
@@ -229,7 +238,8 @@
     return {
       babyName: state.settings.babyName || DEFAULT_BABY_NAME,
       currentWeightG: state.settings.currentWeightG || null,
-      currentHeightCm: state.settings.currentHeightCm || null
+      currentHeightCm: state.settings.currentHeightCm || null,
+      groqApiKey: state.settings.groqApiKey || ''
     };
   }
 

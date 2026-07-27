@@ -4,13 +4,11 @@
   const AI_CACHE_PREFIX = 'bebistakip_ai_';
   const DEFAULT_SETTINGS = {
     babyName: 'Ediz',
-    birthDate: '2026-05-14',
-    groqApiKey: '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'
+    birthDate: '2026-05-14'
   };
   const FIXED_BIRTH_DATE = DEFAULT_SETTINGS.birthDate;
   const FIXED_BIRTH_WEIGHT_G = 3225;
   const FIXED_BIRTH_HEIGHT_CM = 54;
-  const FIXED_GROQ_KEY = DEFAULT_SETTINGS.groqApiKey;
   const GROQ_MODELS = [
     'llama-3.3-70b-versatile',
     'llama-3.1-8b-instant'
@@ -155,7 +153,7 @@
       birthHeightCm: FIXED_BIRTH_HEIGHT_CM,
       currentWeightG: growth.currentWeightG,
       currentHeightCm: growth.currentHeightCm,
-      groqApiKey: FIXED_GROQ_KEY
+      groqApiKey: synced.groqApiKey || ''
     };
   }
 
