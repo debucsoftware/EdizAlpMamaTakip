@@ -7,8 +7,8 @@
     birthDate: '2026-05-14'
   };
   const FIXED_BIRTH_DATE = DEFAULT_SETTINGS.birthDate;
-  const FIXED_BIRTH_WEIGHT_G = 3225;
-  const FIXED_BIRTH_HEIGHT_CM = 54;
+  const FIXED_BIRTH_WEIGHT_G = 3235;
+  const FIXED_BIRTH_HEIGHT_CM = 50;
   const GROQ_MODELS = [
     'llama-3.3-70b-versatile',
     'llama-3.1-8b-instant'
@@ -643,7 +643,7 @@
       'EMZİRME TREND: ' + history.emdiTrend + ' (son 3 gün ort. ' + history.avgRecent3Emdi + 'dk, önceki 3 gün ort. ' + history.avgPrev3Emdi + 'dk)\n' +
       'BİRLEŞİK YORUM: ' + history.trend + '\n\n' +
       'ÖNEMLİ: Değerlendirmeyi yalnızca süt/mama ml miktarına göre yapma. Emzirme dakikaları da beslenmenin ayrılmaz parçasıdır. ml azalıp emzirme artıyorsa bunu "beslenme azalıyor" diye tek başına söyleme; emzirme artışını mutlaka belirt ve ml+emzirme dengesini birlikte yorumla.\n' +
-      'Boy/kilo gelişimini (doğum: 3225 gr / 54 cm ve güncel değerler) beslenme değerlendirmesinde mutlaka dikkate al.\n' +
+      'Boy/kilo gelişimini (doğum: 3235 gr / 50 cm ve güncel değerler) beslenme değerlendirmesinde mutlaka dikkate al.\n' +
       'Değerlendirmeyi son 7 günün geçmişi, ortalamalar ve genel eğilim üzerinden yap. Bugünü bu bağlamda yorumla.\n' +
       'Yanıtın TAMAMEN Türkçe olmalı. Çince, İngilizce veya başka dilde tek bir kelime/karakter bile kullanma.\n' +
       'Türkçe, sıcak, max 200 kelime. Başlıklar: 📊 Genel Değerlendirme, 📅 Bugün, 📏 Büyüme, 💡 Tavsiye, 💩 Bez, 🌈 Moral. Teşhis koyma, endişede doktora yönlendir.';
